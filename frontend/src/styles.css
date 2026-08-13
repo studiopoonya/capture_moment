@@ -1,0 +1,457 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Capture Moments design system — playful pastel photobooth.
+ * All colors are oklch tokens. Never hardcode colors in components.
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 6px);
+  --radius-md: calc(var(--radius) - 3px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 6px);
+  --radius-2xl: calc(var(--radius) + 12px);
+  --radius-3xl: calc(var(--radius) + 20px);
+  --radius-4xl: calc(var(--radius) + 28px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-mint: var(--mint);
+  --color-mint-foreground: var(--mint-foreground);
+  --color-lemon: var(--lemon);
+  --color-lemon-foreground: var(--lemon-foreground);
+  --color-sky: var(--sky);
+  --color-sky-foreground: var(--sky-foreground);
+  --color-lilac: var(--lilac);
+  --color-lilac-foreground: var(--lilac-foreground);
+  --color-rose: var(--rose);
+  --color-rose-foreground: var(--rose-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --font-display: "Baloo 2", ui-rounded, system-ui, sans-serif;
+  --font-sans: "Nunito", ui-sans-serif, system-ui, sans-serif;
+  --font-elegant: "Playfair Display", "Iowan Old Style", serif;
+  --animate-pop-in: pop-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  --animate-fade-up: fade-up 0.45s ease-out both;
+  --animate-countdown: countdown 1s ease-out both;
+  --animate-flash: flash 0.5s ease-out both;
+  --animate-float: float 5s ease-in-out infinite;
+  --animate-shimmer: shimmer 2.4s linear infinite;
+  --animate-ken-burns: ken-burns 20s ease-in-out infinite;
+  --animate-float-up: float-up var(--particle-duration, 10s) linear infinite;
+  --animate-pulse-glow: pulse-glow 4s ease-in-out infinite;
+  --animate-fade-in: fade-in 0.5s ease-out both;
+  --animate-photo-reveal: photo-reveal 0.55s ease-out both;
+}
+
+:root {
+  --radius: 0.65rem;
+
+  --background: oklch(0.51 0.15 253);
+  --foreground: oklch(0.98 0.008 90);
+
+  --card: oklch(0.63 0.13 250);
+  --card-foreground: oklch(0.98 0.008 90);
+  --popover: oklch(0.63 0.13 250);
+  --popover-foreground: oklch(0.98 0.008 90);
+
+  --primary: oklch(0.78 0.13 80);
+  --primary-foreground: oklch(0.22 0.05 253);
+
+  --secondary: oklch(0.42 0.14 254);
+  --secondary-foreground: oklch(0.97 0.01 90);
+
+  --muted: oklch(0.46 0.13 253);
+  --muted-foreground: oklch(0.87 0.025 100);
+
+  --accent: oklch(0.78 0.13 80);
+  --accent-foreground: oklch(0.18 0.03 260);
+
+  --mint: oklch(0.8 0.09 165);
+  --mint-foreground: oklch(0.22 0.05 165);
+  --lemon: oklch(0.83 0.1 95);
+  --lemon-foreground: oklch(0.28 0.06 80);
+  --sky: oklch(0.78 0.08 235);
+  --sky-foreground: oklch(0.24 0.05 250);
+  --lilac: oklch(0.77 0.09 300);
+  --lilac-foreground: oklch(0.26 0.06 300);
+  --rose: oklch(0.85 0.09 10);
+  --rose-foreground: oklch(0.32 0.09 12);
+
+  --destructive: oklch(0.62 0.19 20);
+  --destructive-foreground: oklch(0.97 0.012 90);
+
+  --border: oklch(1 0 0 / 16%);
+  --input: oklch(1 0 0 / 18%);
+  --ring: oklch(0.78 0.13 80);
+
+  --gradient-hero: linear-gradient(
+    180deg,
+    oklch(0.51 0.15 253) 0%,
+    oklch(0.68 0.11 244) 55%,
+    oklch(0.94 0.02 220) 85%,
+    oklch(0.99 0.008 90) 100%
+  );
+  --gradient-primary: linear-gradient(120deg, oklch(0.72 0.13 75), oklch(0.82 0.14 88));
+  --shadow-soft: 0 10px 30px -12px oklch(0.18 0.08 255 / 0.4);
+  --shadow-pop: 0 18px 40px -14px oklch(0.18 0.08 255 / 0.5);
+  --shadow-sticker: 0 4px 0 0 oklch(0.4 0.14 253);
+
+  --sidebar: oklch(0.46 0.14 253);
+  --sidebar-foreground: oklch(0.98 0.008 90);
+  --sidebar-primary: oklch(0.78 0.13 80);
+  --sidebar-primary-foreground: oklch(0.22 0.05 253);
+  --sidebar-accent: oklch(0.42 0.14 254);
+  --sidebar-accent-foreground: oklch(0.97 0.01 90);
+  --sidebar-border: oklch(1 0 0 / 16%);
+  --sidebar-ring: oklch(0.78 0.13 80);
+}
+
+/* Admin dashboard uses a light, neutral back-office palette instead of the
+   vivid consumer-facing theme. Toggled on <html> while the /admin route is
+   mounted (see admin.tsx) so portaled Radix content — dialogs, selects — picks
+   it up too. Brand primary/accent (gold) stay unchanged for continuity. */
+:root.admin-light {
+  --background: oklch(0.985 0.004 90);
+  --foreground: oklch(0.22 0.02 260);
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.22 0.02 260);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.22 0.02 260);
+
+  --secondary: oklch(0.95 0.008 90);
+  --secondary-foreground: oklch(0.32 0.02 260);
+
+  --muted: oklch(0.96 0.006 90);
+  --muted-foreground: oklch(0.52 0.015 260);
+
+  --border: oklch(0.9 0.008 90);
+  --input: oklch(0.88 0.008 90);
+  --ring: oklch(0.78 0.13 80);
+
+  --sidebar: oklch(1 0 0);
+  --sidebar-foreground: oklch(0.22 0.02 260);
+  --sidebar-primary: oklch(0.78 0.13 80);
+  --sidebar-primary-foreground: oklch(0.22 0.05 253);
+  --sidebar-accent: oklch(0.96 0.006 90);
+  --sidebar-accent-foreground: oklch(0.22 0.02 260);
+  --sidebar-border: oklch(0.9 0.008 90);
+  --sidebar-ring: oklch(0.78 0.13 80);
+}
+
+/* Frame-picker landing page uses a white background with a blue accent instead of
+   the vivid hero gradient. Toggled on <html> while "/" is mounted (see index.tsx). */
+:root.landing-light {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.32 0.14 254);
+  --muted-foreground: oklch(0.52 0.12 254);
+
+  --card: oklch(0.97 0.015 250);
+  --card-foreground: oklch(0.32 0.14 254);
+
+  --primary: oklch(0.55 0.16 254);
+  --primary-foreground: oklch(0.98 0.008 90);
+
+  --gradient-primary: linear-gradient(120deg, oklch(0.5 0.17 255), oklch(0.62 0.15 250));
+
+  --ring: oklch(0.55 0.16 254);
+}
+
+/* Customer photo-session flow (welcome → capture → result) uses a dark, "mewah" maroon +
+   gold palette instead of the vivid consumer-facing blue theme, to match the wedding-branded
+   welcome screen. Toggled on <html> while a "/$customerSlug" session is mounted (see
+   $customerSlug.tsx) so portaled Radix content picks it up too. */
+:root.session-luxe {
+  --background: oklch(0.16 0.025 30);
+  --foreground: oklch(0.96 0.015 80);
+
+  --card: oklch(0.24 0.04 28);
+  --card-foreground: oklch(0.96 0.015 80);
+  --popover: oklch(0.24 0.04 28);
+  --popover-foreground: oklch(0.96 0.015 80);
+
+  --primary-foreground: oklch(0.2 0.04 30);
+
+  --secondary: oklch(0.28 0.045 28);
+  --secondary-foreground: oklch(0.96 0.015 80);
+
+  --muted: oklch(0.26 0.035 28);
+  --muted-foreground: oklch(0.78 0.05 75);
+
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.78 0.13 80);
+
+  --gradient-hero: linear-gradient(
+    180deg,
+    oklch(0.14 0.02 30) 0%,
+    oklch(0.22 0.045 27) 50%,
+    oklch(0.14 0.02 30) 100%
+  );
+  --shadow-soft: 0 10px 30px -12px oklch(0.05 0.01 30 / 0.6);
+  --shadow-pop: 0 18px 40px -14px oklch(0.05 0.01 30 / 0.7);
+}
+
+.dark {
+  --background: oklch(0.21 0.03 320);
+  --foreground: oklch(0.96 0.015 340);
+  --card: oklch(0.26 0.035 320);
+  --card-foreground: oklch(0.96 0.015 340);
+  --popover: oklch(0.26 0.035 320);
+  --popover-foreground: oklch(0.96 0.015 340);
+  --primary: oklch(0.78 0.14 5);
+  --primary-foreground: oklch(0.22 0.04 340);
+  --secondary: oklch(0.32 0.04 320);
+  --secondary-foreground: oklch(0.96 0.015 340);
+  --muted: oklch(0.3 0.03 320);
+  --muted-foreground: oklch(0.75 0.03 330);
+  --accent: oklch(0.45 0.07 195);
+  --accent-foreground: oklch(0.96 0.015 200);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.78 0.14 5);
+}
+
+@keyframes pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.85) translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes fade-up {
+  0% {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes countdown {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  35% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.55);
+  }
+}
+
+@keyframes flash {
+  0% {
+    opacity: 0.95;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-3deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(3deg);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -180% 0;
+  }
+  100% {
+    background-position: 180% 0;
+  }
+}
+
+@keyframes ken-burns {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+@keyframes float-up {
+  0% {
+    transform: translate(0, 0);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.9;
+  }
+  85% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate(var(--drift, 0px), -1000px);
+    opacity: 0;
+  }
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.1);
+  }
+}
+
+@keyframes fade-in {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes photo-reveal {
+  0% {
+    opacity: 0;
+    transform: scale(1.15);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@utility bg-hero {
+  background-image: var(--gradient-hero);
+}
+
+@utility bg-gradient-primary {
+  background-image: var(--gradient-primary);
+}
+
+@utility shadow-soft {
+  box-shadow: var(--shadow-soft);
+}
+
+@utility shadow-pop {
+  box-shadow: var(--shadow-pop);
+}
+
+@utility tap-press {
+  transition:
+    transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.18s ease;
+  &:active {
+    transform: scale(0.95);
+  }
+}
+
+@utility hover-lift {
+  transition:
+    transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.25s ease;
+  &:hover {
+    transform: translateY(-6px);
+    box-shadow: var(--shadow-pop);
+  }
+  &:active {
+    transform: scale(0.97);
+  }
+}
+
+@utility glow-card {
+  box-shadow: 0 0 32px 6px oklch(1 0 0 / 0.2);
+}
+
+@utility glow-gold {
+  box-shadow:
+    0 0 0 1px oklch(0.78 0.13 80 / 0.5),
+    0 0 20px 4px oklch(0.78 0.13 80 / 0.65);
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@utility text-shimmer {
+  background-image: linear-gradient(
+    90deg,
+    var(--primary) 0%,
+    var(--foreground) 35%,
+    var(--primary) 55%,
+    var(--foreground) 100%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 4s linear infinite;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+  }
+}
