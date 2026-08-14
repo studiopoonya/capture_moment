@@ -1,0 +1,91 @@
+CAPTURE MOMENTS — CATATAN DEPLOYMENT & CARA UPDATE
+====================================================
+
+INFO PRODUCTION
+----------------
+Frontend : https://capture-moment.studiopoonya.net
+Backend  : https://api-capture-moment.studiopoonya.net
+Admin    : https://capture-moment.studiopoonya.net/admin
+Repo     : https://github.com/studiopoonya/capture_moment.git (monorepo, folder backend/ + frontend/)
+
+VPS      : aaPanel + OpenLiteSpeed 1.8.5
+Lokasi backend di server : /www/wwwroot/api-capture-moment.studiopoonya.net
+Lokasi frontend (hasil build, bukan source) : /www/wwwroot/capture-moment.studiopoonya.net
+Lokasi source frontend (buat update) : /www/wwwroot/capture-moment-src
+
+
+CARA UPDATE BACKEND (Laravel)
+-------------------------------
+Folder site backend itu memang hasil `git clone` langsung, jadi update-nya simpel:
+
+  cd /www/wwwroot/api-capture-moment.studiopoonya.net
+  git pull origin main
+  composer install --no-dev
+  php artisan migrate --force
+  php artisan config:clear
+  php artisan cache:clear
+  chown -R www:www storage bootstrap/cache
+
+Catatan:
+- `composer install` cuma perlu kalau ada perubahan dependency (composer.json berubah).
+  Kalau cuma ubah kode PHP biasa, boleh skip biar lebih cepat.
+- `migrate --force` cuma perlu kalau ada migration baru.
+- Kalau nambah env variable baru, edit manual: nano .env
+
+
+CARA UPDATE FRONTEND (React)
+------------------------------
+Source code frontend TIDAK disimpan langsung di folder site (biar node_modules
+dan source code gak ke-expose publik). Jadi ada 2 tahap: pull+build di folder
+source terpisah, lalu copy hasil build-nya ke folder site.
+
+Setup folder source (cukup 1x saja, kalau /www/wwwroot/capture-moment-src
+belum ada):
+
+  cd /www/wwwroot
+  git clone https://github.com/studiopoonya/capture_moment.git capture-moment-src
+
+Tiap ada update, jalankan ini:
+
+  cd /www/wwwroot/capture-moment-src
+  git pull origin main
+  cd frontend
+  npm install
+  VITE_API_URL=https://api-capture-moment.studiopoonya.net/api npm run build
+  rm -rf /www/wwwroot/capture-moment.studiopoonya.net/*
+  cp -r dist/. /www/wwwroot/capture-moment.studiopoonya.net/
+  chown -R www:www /www/wwwroot/capture-moment.studiopoonya.net
+
+
+HAL-HAL YANG PERNAH BIKIN MASALAH (kalau kejadian lagi)
+-----------------------------------------------------------
+1. SSL kepasang cert domain lain / 404 "Proudly powered by LiteSpeed"
+   walau setting di panel udah kelihatan benar.
+   -> Ini bug sync aaPanel: kadang vhost baru gak ke-generate ke file utama
+      OpenLiteSpeed (/usr/local/lsws/conf/httpd_config.conf), walau file
+      config per-site di /www/server/panel/vhost/openlitespeed/ udah benar.
+   -> Cek: grep -n "virtualhost <domain>" /usr/local/lsws/conf/httpd_config.conf
+      Kalau kosong, tempel manual:
+      cat /www/server/panel/vhost/openlitespeed/<domain>.conf >> /usr/local/lsws/conf/httpd_config.conf
+      lalu: service lsws restart
+
+2. Halaman Laravel gak muncul (404 dari LiteSpeed, bukan dari Laravel).
+   -> Cek docRoot di /www/server/panel/vhost/openlitespeed/detail/<domain>.conf
+      Backend Laravel harus: $VH_ROOT/public
+      Frontend (static) harus: $VH_ROOT (tanpa /public)
+   -> Kalau salah, bisa diedit manual pakai sed, atau lewat panel:
+      Website > site > Directory > Running Directory > Save
+
+3. Command git/composer/npm butuh dijalankan sebagai root di VPS — akan ada
+   warning "Do not run as root", jawab "yes" untuk lanjut, aman untuk VPS
+   pribadi seperti ini.
+
+4. Error "Operation not permitted" saat chown ke file .user.ini — ini file
+   yang di-protect aaPanel, aman diabaikan.
+
+
+LOGIN ADMIN
+------------
+Email default: admin@studiopoonya.net
+Password default: dibuat lewat seeder (lihat backend/database/seeders/DatabaseSeeder.php)
+-> GANTI password ini setelah login pertama kali di production.
