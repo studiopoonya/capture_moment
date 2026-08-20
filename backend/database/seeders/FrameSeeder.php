@@ -12,7 +12,6 @@ class FrameSeeder extends Seeder
         $frames = [
             [
                 'name' => 'Minty Fresh Strip',
-                'tone' => 'mint',
                 'image' => asset('images/frames/frame-mint.jpg'),
                 'active' => true,
                 'rounded' => false,
@@ -24,7 +23,6 @@ class FrameSeeder extends Seeder
             ],
             [
                 'name' => 'Pink Bows',
-                'tone' => 'primary',
                 'image' => asset('images/frames/frame-pink.jpg'),
                 'active' => true,
                 'rounded' => false,
@@ -37,7 +35,6 @@ class FrameSeeder extends Seeder
             ],
             [
                 'name' => 'Sunny Daisy',
-                'tone' => 'lemon',
                 'image' => asset('images/frames/frame-sun.jpg'),
                 'active' => true,
                 'rounded' => false,
@@ -48,7 +45,6 @@ class FrameSeeder extends Seeder
             ],
             [
                 'name' => 'Cloud Nine',
-                'tone' => 'sky',
                 'image' => asset('images/frames/frame-blue.jpg'),
                 'active' => true,
                 'rounded' => false,
@@ -58,7 +54,6 @@ class FrameSeeder extends Seeder
             ],
             [
                 'name' => 'Lilac Dream (draft)',
-                'tone' => 'lilac',
                 'image' => asset('images/frames/frame-pink.jpg'),
                 'active' => false,
                 'rounded' => false,

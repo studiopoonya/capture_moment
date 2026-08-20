@@ -20,6 +20,7 @@
 # Runtime-uploaded content (frame images, session/result/sticker uploads, xmp presets) —
 # generated at runtime on each deployment, not part of the app's source.
 /public/images/frames/uploads
+/public/images/gif-frames/uploads
 /public/images/results/uploads
 /public/images/sessions/uploads
 /public/images/stickers/uploads

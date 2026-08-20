@@ -92,7 +92,6 @@ export type Frame = {
   id: number;
   name: string;
   image: string;
-  tone: "primary" | "mint" | "lemon" | "sky" | "lilac";
   active: boolean;
   rounded: boolean;
   slots: Slot[];
@@ -100,7 +99,6 @@ export type Frame = {
 
 export type FrameInput = {
   name: string;
-  tone: Frame["tone"];
   image: string;
   active: boolean;
   rounded: boolean;
@@ -123,6 +121,9 @@ export type PhotoSession = {
   id: number;
   customer_name: string;
   slug: string;
+  share_token: string;
+  event_date: string | null;
+  gif_frame: GifFrame | null;
   welcome_photo: string | null;
   welcome_title: string | null;
   frames: Frame[];
@@ -224,8 +225,71 @@ export function deleteSticker(id: number) {
   return request<void>(`/stickers/${id}`, { method: "DELETE" });
 }
 
+/** slot_x/y/w/h (%) mark where the photo window sits inside `image` — like a Frame's single slot. */
+export type GifFrame = {
+  id: number;
+  name: string;
+  image: string;
+  slot_x: number;
+  slot_y: number;
+  slot_w: number;
+  slot_h: number;
+  rounded: boolean;
+  active: boolean;
+};
+
+export type GifFrameSlot = { x: number; y: number; w: number; h: number };
+
+/** Admin: every GIF frame regardless of active state — picked per-session when creating a link. */
+export function getAdminGifFrames() {
+  return request<GifFrame[]>("/admin/gif-frames");
+}
+
+export function createGifFrame(name: string, image: File, slot: GifFrameSlot, rounded: boolean) {
+  const form = new FormData();
+  form.append("name", name);
+  form.append("image", image);
+  form.append("slot_x", String(slot.x));
+  form.append("slot_y", String(slot.y));
+  form.append("slot_w", String(slot.w));
+  form.append("slot_h", String(slot.h));
+  form.append("rounded", rounded ? "1" : "0");
+  return requestForm<GifFrame>("/gif-frames", form);
+}
+
+export function updateGifFrame(
+  id: number,
+  data: {
+    name?: string;
+    active?: boolean;
+    image?: File;
+    slot?: GifFrameSlot;
+    rounded?: boolean;
+  },
+) {
+  const form = new FormData();
+  form.append("_method", "PUT");
+  if (data.name !== undefined) form.append("name", data.name);
+  if (data.active !== undefined) form.append("active", data.active ? "1" : "0");
+  if (data.image) form.append("image", data.image);
+  if (data.slot) {
+    form.append("slot_x", String(data.slot.x));
+    form.append("slot_y", String(data.slot.y));
+    form.append("slot_w", String(data.slot.w));
+    form.append("slot_h", String(data.slot.h));
+  }
+  if (data.rounded !== undefined) form.append("rounded", data.rounded ? "1" : "0");
+  return requestForm<GifFrame>(`/gif-frames/${id}`, form);
+}
+
+export function deleteGifFrame(id: number) {
+  return request<void>(`/gif-frames/${id}`, { method: "DELETE" });
+}
+
 export function createSession(data: {
   customer_name: string;
+  event_date?: string | null;
+  gif_frame_id?: number | null;
   frame_ids: number[];
   filter_ids?: number[];
   sticker_ids?: number[];
@@ -239,6 +303,8 @@ export function updateSession(
   id: number,
   data: {
     customer_name?: string;
+    event_date?: string | null;
+    gif_frame_id?: number | null;
     frame_ids?: number[];
     filter_ids?: number[];
     sticker_ids?: number[];
@@ -258,6 +324,11 @@ export function uploadSessionWelcomePhoto(file: File): Promise<{ url: string }> 
 
 export function getSession(slug: string) {
   return request<PhotoSession>(`/sessions/${slug}`);
+}
+
+/** Public: view-only lookup behind the gallery's "Bagikan Semua" link — no auth, no delete route. */
+export function getSharedSessionGallery(token: string) {
+  return request<PhotoSession>(`/shared-sessions/${token}`);
 }
 
 /** Admin: every session, for management. */

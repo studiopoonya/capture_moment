@@ -15,6 +15,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as CaptureFrameIdRouteImport } from './routes/capture.$frameId'
 import { Route as ResultFrameIdRouteImport } from './routes/result.$frameId'
+import { Route as SharedSessionsTokenRouteImport } from './routes/shared-sessions.$token'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -46,6 +47,11 @@ const ResultFrameIdRoute = ResultFrameIdRouteImport.update({
   path: '/result/$frameId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SharedSessionsTokenRoute = SharedSessionsTokenRouteImport.update({
+  id: '/shared-sessions/$token',
+  path: '/shared-sessions/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -54,6 +60,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/capture/$frameId': typeof CaptureFrameIdRoute
   '/result/$frameId': typeof ResultFrameIdRoute
+  '/shared-sessions/$token': typeof SharedSessionsTokenRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -62,6 +69,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/capture/$frameId': typeof CaptureFrameIdRoute
   '/result/$frameId': typeof ResultFrameIdRoute
+  '/shared-sessions/$token': typeof SharedSessionsTokenRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -71,6 +79,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/capture/$frameId': typeof CaptureFrameIdRoute
   '/result/$frameId': typeof ResultFrameIdRoute
+  '/shared-sessions/$token': typeof SharedSessionsTokenRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -81,6 +90,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/capture/$frameId'
     | '/result/$frameId'
+    | '/shared-sessions/$token'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -89,6 +99,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/capture/$frameId'
     | '/result/$frameId'
+    | '/shared-sessions/$token'
   id:
     | '__root__'
     | '/'
@@ -97,6 +108,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/capture/$frameId'
     | '/result/$frameId'
+    | '/shared-sessions/$token'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -106,6 +118,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   CaptureFrameIdRoute: typeof CaptureFrameIdRoute
   ResultFrameIdRoute: typeof ResultFrameIdRoute
+  SharedSessionsTokenRoute: typeof SharedSessionsTokenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -152,6 +165,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ResultFrameIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/shared-sessions/$token': {
+      id: '/shared-sessions/$token'
+      path: '/shared-sessions/$token'
+      fullPath: '/shared-sessions/$token'
+      preLoaderRoute: typeof SharedSessionsTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -162,6 +182,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   CaptureFrameIdRoute: CaptureFrameIdRoute,
   ResultFrameIdRoute: ResultFrameIdRoute,
+  SharedSessionsTokenRoute: SharedSessionsTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

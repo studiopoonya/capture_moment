@@ -102,13 +102,15 @@ export function FrameComposite({
             ))}
           </mask>
         </defs>
+        {/* "meet" (not "slice") — frame artwork uploaded at a ratio other than 2:3 (4R)
+            gets letterboxed instead of cropped, so its border/decoration is never cut off. */}
         <image
           href={frame.image}
           x="0"
           y="0"
           width="100"
           height="150"
-          preserveAspectRatio="xMidYMid slice"
+          preserveAspectRatio="xMidYMid meet"
           mask={`url(#${maskId})`}
         />
       </svg>

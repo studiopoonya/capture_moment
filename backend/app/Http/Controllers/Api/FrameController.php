@@ -26,7 +26,6 @@ class FrameController extends Controller
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'tone' => ['required', 'string', 'in:primary,mint,lemon,sky,lilac'],
             'image' => ['required', 'string'],
             'active' => ['boolean'],
             'rounded' => ['boolean'],
@@ -45,7 +44,6 @@ class FrameController extends Controller
     {
         $data = $request->validate([
             'name' => ['sometimes', 'required', 'string', 'max:255'],
-            'tone' => ['sometimes', 'required', 'string', 'in:primary,mint,lemon,sky,lilac'],
             'image' => ['sometimes', 'required', 'string'],
             'active' => ['sometimes', 'boolean'],
             'rounded' => ['sometimes', 'boolean'],

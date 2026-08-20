@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\FilterController;
 use App\Http\Controllers\Api\FrameController;
+use App\Http\Controllers\Api\GifFrameController;
 use App\Http\Controllers\Api\MediaController;
 use App\Http\Controllers\Api\PhotoSessionController;
 use App\Http\Controllers\Api\PhotoSessionResultController;
@@ -16,6 +17,7 @@ Route::get('/frames', [FrameController::class, 'index']);
 Route::get('/filters', [FilterController::class, 'index']);
 Route::get('/stickers', [StickerController::class, 'index']);
 Route::get('/sessions/{slug}', [PhotoSessionController::class, 'show']);
+Route::get('/shared-sessions/{token}', [PhotoSessionController::class, 'showSharedGallery']);
 Route::post('/sessions/{session}/results', [PhotoSessionResultController::class, 'store']);
 Route::post('/session-results/{result}/gif', [PhotoSessionResultController::class, 'attachGif']);
 Route::post('/session-results/{result}/voice', [PhotoSessionResultController::class, 'attachVoice']);
@@ -45,6 +47,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/stickers', [StickerController::class, 'store']);
     Route::put('/stickers/{sticker}', [StickerController::class, 'update']);
     Route::delete('/stickers/{sticker}', [StickerController::class, 'destroy']);
+
+    Route::get('/admin/gif-frames', [GifFrameController::class, 'adminIndex']);
+    Route::post('/gif-frames', [GifFrameController::class, 'store']);
+    Route::put('/gif-frames/{gifFrame}', [GifFrameController::class, 'update']);
+    Route::delete('/gif-frames/{gifFrame}', [GifFrameController::class, 'destroy']);
 
     Route::get('/admin/sessions', [PhotoSessionController::class, 'index']);
     Route::post('/sessions', [PhotoSessionController::class, 'store']);

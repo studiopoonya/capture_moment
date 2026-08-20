@@ -12,7 +12,6 @@ class Frame extends Model
 
     protected $fillable = [
         'name',
-        'tone',
         'image',
         'active',
         'rounded',

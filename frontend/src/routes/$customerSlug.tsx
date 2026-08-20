@@ -132,6 +132,7 @@ function CustomerSessionPage() {
         filters={session.filters}
         stickers={session.stickers}
         sessionId={session.id}
+        gifFrame={session.gif_frame}
         onRetake={() => setShots(sessionKey, [])}
       />
     );

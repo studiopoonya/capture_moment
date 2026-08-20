@@ -2,6 +2,7 @@ import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-ro
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  ArrowLeft,
   Camera,
   Check,
   Copy,
@@ -17,6 +18,7 @@ import {
   Plus,
   QrCode,
   Search,
+  Share2,
   Sticker as StickerIcon,
   Trash2,
   Upload,
@@ -34,28 +36,34 @@ import { toCanvasSafeUrl } from "@/lib/compose-result";
 import {
   createFilter,
   createFrame,
+  createGifFrame,
   createSession,
   createSticker,
   deleteFilter,
   deleteFrame,
+  deleteGifFrame,
   deleteSession,
   deleteSessionResult,
   deleteSticker,
   generateSessionResultVideo,
   getAdminFilters,
   getAdminFrames,
+  getAdminGifFrames,
   getAdminSessions,
   getAdminStickers,
   getToken,
   logout,
   updateFilter,
   updateFrame,
+  updateGifFrame,
   updateSession,
   updateSticker,
   uploadFrameImage,
   uploadSessionWelcomePhoto,
   type Frame,
   type FrameInput,
+  type GifFrame,
+  type GifFrameSlot,
   type PhotoFilter,
   type PhotoSession,
   type PhotoSessionResult,
@@ -75,13 +83,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 export const Route = createFileRoute("/admin")({
   beforeLoad: () => {
@@ -107,12 +108,10 @@ export const Route = createFileRoute("/admin")({
   component: AdminPage,
 });
 
-const TONES: Frame["tone"][] = ["primary", "mint", "lemon", "sky", "lilac"];
 const EMPTY_FRAME: Frame = {
   id: 0,
   name: "",
   image: "",
-  tone: "mint",
   active: true,
   rounded: false,
   slots: [],
@@ -125,6 +124,21 @@ function newSlotId(): string {
 function clamp(v: number, min: number, max: number): number {
   return Math.min(Math.max(v, min), Math.max(min, max));
 }
+
+/** Which edges of a resize handle move — the opposite edge(s) stay anchored. Shared by the
+ * Frame slot editor and the GIF frame slot editor. */
+type ResizeDir = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
+
+const RESIZE_HANDLES: { dir: ResizeDir; className: string }[] = [
+  { dir: "nw", className: "top-0 left-0 -translate-x-1/2 -translate-y-1/2 cursor-nwse-resize" },
+  { dir: "n", className: "top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 cursor-ns-resize" },
+  { dir: "ne", className: "top-0 right-0 translate-x-1/2 -translate-y-1/2 cursor-nesw-resize" },
+  { dir: "e", className: "top-1/2 right-0 translate-x-1/2 -translate-y-1/2 cursor-ew-resize" },
+  { dir: "se", className: "bottom-0 right-0 translate-x-1/2 translate-y-1/2 cursor-nwse-resize" },
+  { dir: "s", className: "bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 cursor-ns-resize" },
+  { dir: "sw", className: "bottom-0 left-0 -translate-x-1/2 translate-y-1/2 cursor-nesw-resize" },
+  { dir: "w", className: "top-1/2 left-0 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize" },
+];
 
 function makeSlots(count: number, existing: Slot[] = []): Slot[] {
   const top = 6;
@@ -139,7 +153,6 @@ function makeSlots(count: number, existing: Slot[] = []): Slot[] {
 function toInput(frame: Frame): FrameInput {
   return {
     name: frame.name,
-    tone: frame.tone,
     image: frame.image,
     active: frame.active,
     rounded: frame.rounded,
@@ -152,6 +165,7 @@ const VIEW_META = {
   sessions: { title: "Sesi Customer", desc: "Kelola link sesi foto tiap customer" },
   filters: { title: "Filter", desc: "Kelola preset filter warna yang bisa dipilih customer" },
   stickers: { title: "Stiker", desc: "Kelola stiker yang bisa ditempel customer" },
+  gifFrames: { title: "GIF Manager", desc: "Kelola frame border khusus buat GIF customer" },
   gallery: { title: "Galeri", desc: "Lihat hasil foto customer per sesi" },
 } as const;
 
@@ -164,6 +178,10 @@ function AdminPage() {
   const { data: stickers = [] } = useQuery({
     queryKey: ["admin-stickers"],
     queryFn: getAdminStickers,
+  });
+  const { data: gifFrames = [] } = useQuery({
+    queryKey: ["admin-gif-frames"],
+    queryFn: getAdminGifFrames,
   });
   const [editing, setEditing] = useState<Frame | null>(null);
   const [open, setOpen] = useState(false);
@@ -306,6 +324,17 @@ function AdminPage() {
           >
             <StickerIcon className="h-4 w-4" />
             Stiker
+          </button>
+          <button
+            onClick={() => setView("gifFrames")}
+            className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-bold ${
+              view === "gifFrames"
+                ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                : "text-muted-foreground hover:bg-sidebar-accent/60"
+            }`}
+          >
+            <Film className="h-4 w-4" />
+            GIF Manager
           </button>
           <button
             onClick={() => setView("gallery")}
@@ -461,7 +490,7 @@ function AdminPage() {
                           </Badge>
                         </div>
                         <p className="mt-0.5 text-xs font-semibold text-muted-foreground">
-                          {frame.slots.length} slot foto · tone {frame.tone}
+                          {frame.slots.length} slot foto
                         </p>
                       </div>
                       <div className="col-span-2 flex flex-wrap items-center gap-2 md:col-span-1">
@@ -509,6 +538,8 @@ function AdminPage() {
             <FilterManagerSection />
           ) : view === "stickers" ? (
             <StickerManagerSection />
+          ) : view === "gifFrames" ? (
+            <GifFrameManagerSection />
           ) : (
             <GallerySection />
           )}
@@ -535,6 +566,7 @@ function AdminPage() {
         frames={frames}
         filters={filters}
         stickers={stickers}
+        gifFrames={gifFrames}
         open={sessionOpen}
         onOpenChange={setSessionOpen}
       />
@@ -826,10 +858,16 @@ function EditSessionDialog({
     queryKey: ["admin-stickers"],
     queryFn: getAdminStickers,
   });
+  const { data: gifFrames = [] } = useQuery({
+    queryKey: ["admin-gif-frames"],
+    queryFn: getAdminGifFrames,
+  });
 
   const [customerName, setCustomerName] = useState("");
+  const [eventDate, setEventDate] = useState("");
   const [frameIds, setFrameIds] = useState<number[]>([]);
   const [frameSearch, setFrameSearch] = useState("");
+  const [gifFrameId, setGifFrameId] = useState<number | null>(null);
   const [filterIds, setFilterIds] = useState<number[]>([]);
   const [stickerIds, setStickerIds] = useState<number[]>([]);
   const [welcomeTitle, setWelcomeTitle] = useState("");
@@ -838,8 +876,10 @@ function EditSessionDialog({
   useEffect(() => {
     if (!session) return;
     setCustomerName(session.customer_name);
+    setEventDate(session.event_date ?? "");
     setFrameIds(session.frames.map((f) => f.id));
     setFrameSearch("");
+    setGifFrameId(session.gif_frame?.id ?? null);
     setFilterIds(session.filters.map((f) => f.id));
     setStickerIds(session.stickers.map((s) => s.id));
     setWelcomeTitle(session.welcome_title ?? "");
@@ -849,6 +889,8 @@ function EditSessionDialog({
   const mutation = useMutation({
     mutationFn: (data: {
       customer_name: string;
+      event_date: string | null;
+      gif_frame_id: number | null;
       frame_ids: number[];
       filter_ids: number[];
       sticker_ids: number[];
@@ -898,6 +940,8 @@ function EditSessionDialog({
               e.preventDefault();
               mutation.mutate({
                 customer_name: customerName,
+                event_date: eventDate || null,
+                gif_frame_id: gifFrameId,
                 frame_ids: frameIds,
                 filter_ids: filterIds,
                 sticker_ids: stickerIds,
@@ -907,15 +951,26 @@ function EditSessionDialog({
             }}
             className="space-y-4"
           >
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-customer-name">Nama customer</Label>
-              <Input
-                id="edit-customer-name"
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                placeholder="cth. Budi & Siti"
-                required
-              />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-customer-name">Nama customer</Label>
+                <Input
+                  id="edit-customer-name"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  placeholder="cth. Budi & Siti"
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-event-date">Tanggal event</Label>
+                <Input
+                  id="edit-event-date"
+                  type="date"
+                  value={eventDate}
+                  onChange={(e) => setEventDate(e.target.value)}
+                />
+              </div>
             </div>
 
             <WelcomeFieldsFieldset
@@ -964,7 +1019,7 @@ function EditSessionDialog({
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-bold">{f.name}</span>
                         <span className="block text-xs font-semibold text-muted-foreground">
-                          {f.slots.length} foto · tone {f.tone}
+                          {f.slots.length} foto
                         </span>
                       </span>
                     </button>
@@ -973,6 +1028,51 @@ function EditSessionDialog({
                 {visibleFrames.length === 0 && (
                   <p className="px-2 py-3 text-center text-xs font-semibold text-muted-foreground">
                     Gak ada frame yang cocok.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Frame buat GIF (opsional)</Label>
+              <p className="text-xs font-semibold text-muted-foreground">
+                Pilih salah satu GIF frame dari GIF Manager. Kosongin buat GIF polos tanpa
+                border.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setGifFrameId(null)}
+                  className={`tap-press rounded-xl border-2 px-3 py-2 text-xs font-bold ${
+                    gifFrameId === null
+                      ? "border-primary bg-primary/10"
+                      : "border-border text-muted-foreground hover:bg-muted/70"
+                  }`}
+                >
+                  Tanpa frame
+                </button>
+                {gifFrames
+                  .filter((g) => g.active || g.id === gifFrameId)
+                  .map((g) => (
+                    <button
+                      type="button"
+                      key={g.id}
+                      onClick={() => setGifFrameId(g.id)}
+                      className={`tap-press flex w-16 flex-col items-center gap-1 rounded-xl border-2 p-1.5 ${
+                        gifFrameId === g.id ? "border-primary bg-primary/10" : "border-border"
+                      }`}
+                    >
+                      <div className="grid h-11 w-11 place-items-center rounded-md bg-muted">
+                        <img src={g.image} alt="" className="h-8 w-8 object-contain" />
+                      </div>
+                      <span className="w-full truncate text-center text-[10px] font-bold">
+                        {g.name}
+                      </span>
+                    </button>
+                  ))}
+                {gifFrames.length === 0 && (
+                  <p className="text-xs font-semibold text-muted-foreground">
+                    Belum ada GIF frame — tambahin dulu di menu "GIF Manager".
                   </p>
                 )}
               </div>
@@ -1489,6 +1589,370 @@ function AddStickerDialog({
   );
 }
 
+function GifFrameManagerSection() {
+  const queryClient = useQueryClient();
+  const { data: gifFrames = [], isLoading } = useQuery({
+    queryKey: ["admin-gif-frames"],
+    queryFn: getAdminGifFrames,
+  });
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<GifFrame | null>(null);
+
+  const updateGifFramesCache = (
+    updater: (old: GifFrame[] | undefined) => GifFrame[] | undefined,
+  ) => {
+    queryClient.setQueryData<GifFrame[]>(["admin-gif-frames"], updater);
+  };
+
+  const toggleMutation = useMutation({
+    mutationFn: ({ id, active }: { id: number; active: boolean }) => updateGifFrame(id, { active }),
+    onSuccess: (updated) =>
+      updateGifFramesCache((old) => old?.map((g) => (g.id === updated.id ? updated : g))),
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Gagal mengubah status"),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteGifFrame,
+    onSuccess: (_data, deletedId) => {
+      updateGifFramesCache((old) => old?.filter((g) => g.id !== deletedId));
+      toast("GIF frame dihapus");
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Gagal menghapus GIF frame"),
+  });
+
+  const handleSaved = (gifFrame: GifFrame) => {
+    updateGifFramesCache((old) =>
+      old?.some((g) => g.id === gifFrame.id)
+        ? old.map((g) => (g.id === gifFrame.id ? gifFrame : g))
+        : [gifFrame, ...(old ?? [])],
+    );
+  };
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-border bg-card">
+      <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
+        <div>
+          <h2 className="font-display text-base font-extrabold">Semua GIF Frame</h2>
+          <p className="text-xs font-semibold text-muted-foreground">
+            {gifFrames.length} frame
+          </p>
+        </div>
+        <Button
+          size="sm"
+          onClick={() => setDialogOpen(true)}
+          className="tap-press rounded-full bg-gradient-primary font-bold"
+        >
+          <Plus className="h-3.5 w-3.5" /> Tambah GIF Frame
+        </Button>
+      </div>
+      {isLoading ? (
+        <p className="px-5 py-8 text-center text-sm font-semibold text-muted-foreground">
+          Memuat GIF frame...
+        </p>
+      ) : gifFrames.length === 0 ? (
+        <p className="px-5 py-8 text-center text-sm font-semibold text-muted-foreground">
+          Belum ada GIF frame. Tambahin di sini biar bisa dipilih pas bikin sesi customer — kalau
+          gak dipilih, GIF customer polos tanpa border.
+        </p>
+      ) : (
+        <ul className="divide-y divide-border">
+          {gifFrames.map((g) => (
+            <li
+              key={g.id}
+              className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-4 px-5 py-4 transition-colors hover:bg-muted/60 md:grid-cols-[auto_minmax(0,1fr)_auto]"
+            >
+              <div className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-muted">
+                <img src={g.image} alt={g.name} className="h-10 w-10 object-contain" />
+              </div>
+              <div className="min-w-0">
+                <p className="truncate font-bold">{g.name}</p>
+              </div>
+              <div className="col-span-2 flex flex-wrap items-center gap-2 md:col-span-1">
+                <Switch
+                  checked={g.active}
+                  onCheckedChange={(v) => toggleMutation.mutate({ id: g.id, active: v })}
+                  aria-label="Toggle aktif"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="tap-press rounded-full font-bold"
+                  onClick={() => setEditing(g)}
+                >
+                  <Pencil className="h-3.5 w-3.5" /> Edit
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="tap-press rounded-full font-bold text-destructive hover:bg-destructive/10"
+                  onClick={() => deleteMutation.mutate(g.id)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" /> Hapus
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      <GifFrameDialog
+        initial={null}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        onSaved={handleSaved}
+      />
+      <GifFrameDialog
+        initial={editing}
+        open={!!editing}
+        onOpenChange={(v) => !v && setEditing(null)}
+        onSaved={handleSaved}
+      />
+    </div>
+  );
+}
+
+function GifFrameDialog({
+  initial,
+  open,
+  onOpenChange,
+  onSaved,
+}: {
+  initial: GifFrame | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSaved: (gifFrame: GifFrame) => void;
+}) {
+  const [name, setName] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [fileUrl, setFileUrl] = useState<string | null>(null);
+  const [slot, setSlot] = useState<GifFrameSlot>({ x: 10, y: 10, w: 80, h: 80 });
+  const [rounded, setRounded] = useState(false);
+  const [interacting, setInteracting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    setName(initial?.name ?? "");
+    setFile(null);
+    setFileUrl(null);
+    setSlot(
+      initial
+        ? { x: initial.slot_x, y: initial.slot_y, w: initial.slot_w, h: initial.slot_h }
+        : { x: 10, y: 10, w: 80, h: 80 },
+    );
+    setRounded(initial?.rounded ?? false);
+  }, [open, initial]);
+
+  const previewUrl = fileUrl ?? initial?.image ?? null;
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      initial
+        ? updateGifFrame(initial.id, {
+            name: name.trim(),
+            slot,
+            rounded,
+            ...(file ? { image: file } : {}),
+          })
+        : createGifFrame(name.trim(), file!, slot, rounded),
+    onSuccess: (gifFrame) => {
+      onSaved(gifFrame);
+      toast.success(initial ? "GIF frame diperbarui" : "GIF frame ditambahkan");
+      onOpenChange(false);
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Gagal menyimpan GIF frame"),
+  });
+
+  const startDrag = (e: React.PointerEvent) => {
+    e.preventDefault();
+    const rect = previewRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const origin = slot;
+    setInteracting(true);
+
+    const onMove = (ev: PointerEvent) => {
+      const dx = ((ev.clientX - startX) / rect.width) * 100;
+      const dy = ((ev.clientY - startY) / rect.height) * 100;
+      setSlot({
+        x: Math.round(clamp(origin.x + dx, 0, 100 - origin.w)),
+        y: Math.round(clamp(origin.y + dy, 0, 100 - origin.h)),
+        w: origin.w,
+        h: origin.h,
+      });
+    };
+    const onUp = () => {
+      setInteracting(false);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
+
+  const startResize = (e: React.PointerEvent, dir: ResizeDir) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const rect = previewRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const origin = slot;
+    setInteracting(true);
+
+    const onMove = (ev: PointerEvent) => {
+      const dxPct = ((ev.clientX - startX) / rect.width) * 100;
+      const dyPct = ((ev.clientY - startY) / rect.height) * 100;
+      let { x, y, w, h } = origin;
+
+      if (dir.includes("e")) {
+        w = clamp(origin.w + dxPct, 6, 100 - origin.x);
+      } else if (dir.includes("w")) {
+        const clampedDx = clamp(dxPct, -origin.x, origin.w - 6);
+        x = origin.x + clampedDx;
+        w = origin.w - clampedDx;
+      }
+      if (dir.includes("s")) {
+        h = clamp(origin.h + dyPct, 6, 100 - origin.y);
+      } else if (dir.includes("n")) {
+        const clampedDy = clamp(dyPct, -origin.y, origin.h - 6);
+        y = origin.y + clampedDy;
+        h = origin.h - clampedDy;
+      }
+
+      setSlot({ x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h) });
+    };
+    const onUp = () => {
+      setInteracting(false);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="font-display">
+            {initial ? "Edit GIF Frame" : "Tambah GIF Frame"}
+          </DialogTitle>
+          <DialogDescription>
+            Upload gambar border, lalu atur posisi jendela foto (geser & tarik titik sudut/sisi).
+          </DialogDescription>
+        </DialogHeader>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (name.trim() && (file || initial)) mutation.mutate();
+          }}
+          className="grid gap-6 sm:grid-cols-[minmax(0,1fr)_240px]"
+        >
+          <div>
+            <p className="mb-2 text-xs font-bold text-muted-foreground">
+              Preview{" "}
+              <span className="font-semibold text-muted-foreground/70">
+                — geser & tarik titik buat atur jendela foto
+              </span>
+            </p>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0] ?? null;
+                setFile(f);
+                setFileUrl(f ? URL.createObjectURL(f) : null);
+              }}
+            />
+            {previewUrl ? (
+              <>
+                <div ref={previewRef} className="relative touch-none select-none">
+                  <img
+                    src={previewUrl}
+                    alt=""
+                    className="w-full rounded-2xl border border-border"
+                  />
+                  <div
+                    onPointerDown={startDrag}
+                    style={{
+                      left: `${slot.x}%`,
+                      top: `${slot.y}%`,
+                      width: `${slot.w}%`,
+                      height: `${slot.h}%`,
+                    }}
+                    className={`absolute cursor-move touch-none border-2 border-primary bg-primary/10 ${
+                      rounded ? "rounded-2xl" : "rounded-none"
+                    } ${interacting ? "" : "transition-all duration-150"}`}
+                  >
+                    {RESIZE_HANDLES.map(({ dir, className }) => (
+                      <div
+                        key={dir}
+                        onPointerDown={(e) => startResize(e, dir)}
+                        className={`tap-press absolute h-4 w-4 touch-none rounded-full border-2 border-card bg-primary shadow-md ${className}`}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="tap-press mt-2 text-xs font-bold text-primary hover:underline"
+                >
+                  Ganti gambar
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="flex aspect-2/3 w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border text-sm font-semibold text-muted-foreground hover:border-primary"
+              >
+                <Upload className="h-4 w-4" /> Pilih gambar GIF frame
+              </button>
+            )}
+          </div>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="gif-frame-name">Nama GIF frame</Label>
+              <Input
+                id="gif-frame-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="cth. Border Gold Wedding"
+                required
+              />
+            </div>
+            <div className="flex items-center justify-between rounded-2xl border border-border p-3">
+              <div>
+                <p className="text-sm font-bold">Slot rounded</p>
+                <p className="text-xs text-muted-foreground">
+                  Sudut jendela foto membulat, atau kotak tegas kalau dimatikan
+                </p>
+              </div>
+              <Switch checked={rounded} onCheckedChange={setRounded} />
+            </div>
+            <Button
+              type="submit"
+              disabled={mutation.isPending || !name.trim() || (!file && !initial)}
+              className="tap-press w-full rounded-full bg-gradient-primary font-extrabold"
+            >
+              {mutation.isPending
+                ? "Menyimpan..."
+                : initial
+                  ? "Simpan Perubahan"
+                  : "Simpan GIF Frame"}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 type GalleryItem = { result: PhotoSessionResult; customerName: string };
 
 async function downloadFile(url: string, filename: string) {
@@ -1515,6 +1979,36 @@ function saveBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(objectUrl);
 }
 
+function formatEventDate(session: PhotoSession): string {
+  const dateStr = session.event_date ?? session.created_at;
+  return new Date(dateStr).toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+async function zipSessionResults(session: PhotoSession): Promise<Blob> {
+  const zip = new JSZip();
+  const results = session.results ?? [];
+  await Promise.all(
+    results.map(async (r, i) => {
+      const imgRes = await fetch(toCanvasSafeUrl(r.image));
+      zip.file(`foto-${i + 1}.png`, await imgRes.blob());
+      if (r.gif) {
+        const gifRes = await fetch(toCanvasSafeUrl(r.gif));
+        zip.file(`foto-${i + 1}.gif`, await gifRes.blob());
+      }
+      if (r.voice) {
+        const voiceRes = await fetch(toCanvasSafeUrl(r.voice));
+        const ext = r.voice.split(".").pop() || "webm";
+        zip.file(`pesan-suara-${i + 1}.${ext}`, await voiceRes.blob());
+      }
+    }),
+  );
+  return zip.generateAsync({ type: "blob" });
+}
+
 function GallerySection() {
   const queryClient = useQueryClient();
   const { data: sessions = [], isLoading } = useQuery({
@@ -1523,32 +2017,26 @@ function GallerySection() {
   });
   const [lightbox, setLightbox] = useState<GalleryItem | null>(null);
   const [downloadingAllId, setDownloadingAllId] = useState<number | null>(null);
+  const [nameFilter, setNameFilter] = useState("");
+  const [dateFilter, setDateFilter] = useState("");
+  const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
 
   const sessionsWithResults = sessions.filter((s) => (s.results?.length ?? 0) > 0);
   const totalPhotos = sessionsWithResults.reduce((a, s) => a + (s.results?.length ?? 0), 0);
+  const selectedSession = sessions.find((s) => s.id === selectedSessionId) ?? null;
+
+  const filteredSessions = sessionsWithResults.filter((s) => {
+    const matchesName = s.customer_name.toLowerCase().includes(nameFilter.trim().toLowerCase());
+    const matchesDate = !dateFilter || (s.event_date ?? s.created_at.slice(0, 10)) === dateFilter;
+    return matchesName && matchesDate;
+  });
+  const hasActiveFilter = nameFilter.trim() !== "" || dateFilter !== "";
 
   const handleDownloadAll = async (session: PhotoSession) => {
     if (downloadingAllId !== null) return;
     setDownloadingAllId(session.id);
     try {
-      const zip = new JSZip();
-      const results = session.results ?? [];
-      await Promise.all(
-        results.map(async (r, i) => {
-          const imgRes = await fetch(toCanvasSafeUrl(r.image));
-          zip.file(`foto-${i + 1}.png`, await imgRes.blob());
-          if (r.gif) {
-            const gifRes = await fetch(toCanvasSafeUrl(r.gif));
-            zip.file(`foto-${i + 1}.gif`, await gifRes.blob());
-          }
-          if (r.voice) {
-            const voiceRes = await fetch(toCanvasSafeUrl(r.voice));
-            const ext = r.voice.split(".").pop() || "webm";
-            zip.file(`pesan-suara-${i + 1}.${ext}`, await voiceRes.blob());
-          }
-        }),
-      );
-      const blob = await zip.generateAsync({ type: "blob" });
+      const blob = await zipSessionResults(session);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -1564,7 +2052,13 @@ function GallerySection() {
     }
   };
 
-  const deleteMutation = useMutation({
+  const handleShareAll = (session: PhotoSession) => {
+    const link = `${window.location.origin}/shared-sessions/${session.share_token}`;
+    navigator.clipboard.writeText(link);
+    toast.success("Link galeri disalin — cuma bisa dilihat & didownload, gak bisa dihapus dari sana");
+  };
+
+  const deleteResultMutation = useMutation({
     mutationFn: deleteSessionResult,
     onSuccess: (_data, deletedId) => {
       queryClient.setQueryData<PhotoSession[]>(["admin-sessions"], (old) =>
@@ -1574,6 +2068,18 @@ function GallerySection() {
       toast("Foto dihapus dari galeri");
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Gagal menghapus foto"),
+  });
+
+  const deleteEventMutation = useMutation({
+    mutationFn: deleteSession,
+    onSuccess: (_data, deletedId) => {
+      queryClient.setQueryData<PhotoSession[]>(["admin-sessions"], (old) =>
+        old?.filter((s) => s.id !== deletedId),
+      );
+      setSelectedSessionId(null);
+      toast("Event dihapus");
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Gagal menghapus event"),
   });
 
   return (
@@ -1587,68 +2093,157 @@ function GallerySection() {
         <StatCard label="Total foto" value={totalPhotos} icon={<Images className="h-4 w-4" />} />
       </div>
 
-      {isLoading ? (
-        <p className="py-8 text-center text-sm font-semibold text-muted-foreground">
-          Memuat galeri...
-        </p>
-      ) : sessionsWithResults.length === 0 ? (
-        <div className="rounded-2xl border border-border bg-card px-5 py-10 text-center">
-          <p className="text-sm font-semibold text-muted-foreground">
-            Belum ada hasil foto. Begitu customer selesai sesi foto, hasilnya otomatis muncul di
-            sini.
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-5">
-          {sessionsWithResults.map((session) => (
-            <div
-              key={session.id}
-              className="overflow-hidden rounded-2xl border border-border bg-card"
-            >
-              <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
-                <div className="min-w-0">
-                  <p className="truncate font-bold">{session.customer_name}</p>
-                  <p className="truncate text-xs font-semibold text-muted-foreground">
-                    /{session.slug}
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-3">
-                  <span className="text-xs font-semibold text-muted-foreground">
-                    {session.results?.length} foto
-                  </span>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={downloadingAllId === session.id}
-                    onClick={() => handleDownloadAll(session)}
-                    className="tap-press rounded-full font-bold"
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                    {downloadingAllId === session.id ? "Menyiapkan..." : "Download Semua"}
-                  </Button>
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-2 p-4 sm:grid-cols-4 md:grid-cols-6">
-                {session.results?.map((r) => (
-                  <button
-                    key={r.id}
-                    type="button"
-                    onClick={() => setLightbox({ result: r, customerName: session.customer_name })}
-                    className="tap-press aspect-2/3 overflow-hidden rounded-xl border border-border"
-                  >
-                    <img src={r.image} alt="" className="h-full w-full object-cover" />
-                  </button>
-                ))}
+      {selectedSession ? (
+        <div className="overflow-hidden rounded-2xl border border-border bg-card">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-3.5">
+            <div className="flex min-w-0 items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setSelectedSessionId(null)}
+                aria-label="Kembali ke galeri"
+                className="tap-press grid h-9 w-9 shrink-0 place-items-center rounded-full border border-border text-muted-foreground hover:bg-muted"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </button>
+              <div className="min-w-0">
+                <p className="truncate font-bold">{selectedSession.customer_name}</p>
+                <p className="truncate text-xs font-semibold text-muted-foreground">
+                  {formatEventDate(selectedSession)} · {selectedSession.results?.length ?? 0} foto
+                </p>
               </div>
             </div>
-          ))}
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleShareAll(selectedSession)}
+                className="tap-press rounded-full font-bold"
+              >
+                <Share2 className="h-3.5 w-3.5" /> Bagikan Semua
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={downloadingAllId === selectedSession.id}
+                onClick={() => handleDownloadAll(selectedSession)}
+                className="tap-press rounded-full font-bold"
+              >
+                <Download className="h-3.5 w-3.5" />
+                {downloadingAllId === selectedSession.id ? "Menyiapkan..." : "Download Semua"}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={deleteEventMutation.isPending}
+                onClick={() => deleteEventMutation.mutate(selectedSession.id)}
+                className="tap-press rounded-full font-bold text-destructive hover:bg-destructive/10"
+              >
+                <Trash2 className="h-3.5 w-3.5" /> Hapus Event
+              </Button>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-2 p-4 sm:grid-cols-4 md:grid-cols-6">
+            {selectedSession.results?.map((r) => (
+              <button
+                key={r.id}
+                type="button"
+                onClick={() =>
+                  setLightbox({ result: r, customerName: selectedSession.customer_name })
+                }
+                className="tap-press aspect-2/3 overflow-hidden rounded-xl border border-border"
+              >
+                <img src={r.image} alt="" className="h-full w-full object-cover" />
+              </button>
+            ))}
+          </div>
         </div>
+      ) : (
+        <>
+          {sessionsWithResults.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative min-w-[200px] flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={nameFilter}
+                  onChange={(e) => setNameFilter(e.target.value)}
+                  placeholder="Cari nama customer..."
+                  className="h-9 pl-8 text-sm"
+                />
+              </div>
+              <Input
+                type="date"
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                className="h-9 w-auto text-sm"
+              />
+              {hasActiveFilter && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setNameFilter("");
+                    setDateFilter("");
+                  }}
+                  className="tap-press rounded-full font-bold"
+                >
+                  <X className="h-3.5 w-3.5" /> Reset
+                </Button>
+              )}
+            </div>
+          )}
+
+          {isLoading ? (
+            <p className="py-8 text-center text-sm font-semibold text-muted-foreground">
+              Memuat galeri...
+            </p>
+          ) : sessionsWithResults.length === 0 ? (
+            <div className="rounded-2xl border border-border bg-card px-5 py-10 text-center">
+              <p className="text-sm font-semibold text-muted-foreground">
+                Belum ada hasil foto. Begitu customer selesai sesi foto, hasilnya otomatis muncul
+                di sini.
+              </p>
+            </div>
+          ) : filteredSessions.length === 0 ? (
+            <div className="rounded-2xl border border-border bg-card px-5 py-10 text-center">
+              <p className="text-sm font-semibold text-muted-foreground">
+                Gak ada sesi yang cocok dengan filter kamu.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+              {filteredSessions.map((session) => (
+                <button
+                  key={session.id}
+                  type="button"
+                  onClick={() => setSelectedSessionId(session.id)}
+                  className="tap-press overflow-hidden rounded-2xl border border-border bg-card text-left shadow-soft"
+                >
+                  <div className="aspect-2/3 overflow-hidden bg-muted">
+                    {session.results?.[0] && (
+                      <img
+                        src={session.results[0].image}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    )}
+                  </div>
+                  <div className="p-3">
+                    <p className="truncate text-sm font-bold">{session.customer_name}</p>
+                    <p className="truncate text-xs font-semibold text-muted-foreground">
+                      {formatEventDate(session)}
+                    </p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       <GalleryLightbox
         item={lightbox}
         onClose={() => setLightbox(null)}
-        onDelete={(id) => deleteMutation.mutate(id)}
+        onDelete={(id) => deleteResultMutation.mutate(id)}
         onVideoGenerated={(updated) => {
           queryClient.setQueryData<PhotoSession[]>(["admin-sessions"], (old) =>
             old?.map((s) => ({
@@ -1658,7 +2253,7 @@ function GallerySection() {
           );
           setLightbox((cur) => (cur && cur.result.id === updated.id ? { ...cur, result: updated } : cur));
         }}
-        deleting={deleteMutation.isPending}
+        deleting={deleteResultMutation.isPending}
       />
     </div>
   );
@@ -1739,7 +2334,7 @@ function GalleryLightbox({
 
   return (
     <Dialog open={!!item} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent className="sm:max-w-2xl">
         {item && (
           <>
             <DialogHeader>
@@ -1749,64 +2344,64 @@ function GalleryLightbox({
                 {new Date(item.result.created_at).toLocaleString("id-ID")}
               </DialogDescription>
             </DialogHeader>
-            <div className="overflow-hidden rounded-2xl border border-border">
-              <img
-                src={viewMode === "gif" && item.result.gif ? item.result.gif : item.result.image}
-                alt=""
-                className="w-full"
-              />
-            </div>
-            {item.result.gif && (
-              <button
-                type="button"
-                onClick={() => setViewMode((m) => (m === "photo" ? "gif" : "photo"))}
-                className="tap-press flex w-full items-center justify-center gap-1.5 rounded-full border border-border py-2 text-xs font-extrabold text-muted-foreground hover:bg-muted/70"
-              >
-                {viewMode === "photo" ? (
-                  <>
-                    <Film className="h-3.5 w-3.5" /> Lihat GIF
-                  </>
-                ) : (
-                  <>
-                    <ImagePlus className="h-3.5 w-3.5" /> Lihat Foto
-                  </>
-                )}
-              </button>
-            )}
-            {item.result.voice && (
-              <div className="rounded-2xl border border-border p-3">
-                <p className="flex items-center gap-1.5 text-xs font-extrabold text-muted-foreground">
-                  <Mic className="h-3.5 w-3.5" /> Pesan suara dari tamu
-                </p>
-                <audio controls src={item.result.voice} className="mt-2 w-full" />
+            <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_220px] sm:items-start">
+              <div className="overflow-hidden rounded-2xl border border-border">
+                <img
+                  src={viewMode === "gif" && item.result.gif ? item.result.gif : item.result.image}
+                  alt=""
+                  className="w-full"
+                />
               </div>
-            )}
-            <div className="space-y-2">
-              <Button
-                variant="outline"
-                disabled={downloading}
-                onClick={handleDownload}
-                className="tap-press w-full rounded-full font-bold"
-              >
-                <Download className="h-4 w-4" /> {downloading ? "Menyiapkan..." : "Download Foto"}
-              </Button>
-              {item.result.voice && (
+              <div className="space-y-2">
+                {item.result.gif && (
+                  <button
+                    type="button"
+                    onClick={() => setViewMode((m) => (m === "photo" ? "gif" : "photo"))}
+                    className="tap-press flex w-full items-center justify-center gap-1.5 rounded-full border border-border py-2 text-xs font-extrabold text-muted-foreground hover:bg-muted/70"
+                  >
+                    {viewMode === "photo" ? (
+                      <>
+                        <Film className="h-3.5 w-3.5" /> Lihat GIF
+                      </>
+                    ) : (
+                      <>
+                        <ImagePlus className="h-3.5 w-3.5" /> Lihat Foto
+                      </>
+                    )}
+                  </button>
+                )}
+                {item.result.voice && (
+                  <div className="rounded-2xl border border-border p-3">
+                    <p className="flex items-center gap-1.5 text-xs font-extrabold text-muted-foreground">
+                      <Mic className="h-3.5 w-3.5" /> Pesan suara dari tamu
+                    </p>
+                    <audio controls src={item.result.voice} className="mt-2 w-full" />
+                  </div>
+                )}
                 <Button
-                  disabled={generatingVideo}
-                  onClick={handleDownloadVideo}
-                  className="tap-press w-full rounded-full bg-gradient-primary font-bold text-primary-foreground"
+                  variant="outline"
+                  disabled={downloading}
+                  onClick={handleDownload}
+                  className="tap-press w-full rounded-full font-bold"
                 >
-                  <Video className="h-4 w-4" />
-                  {generatingVideo ? "Menyiapkan video..." : "Download Foto + Suara"}
+                  <Download className="h-4 w-4" /> {downloading ? "Menyiapkan..." : "Download Foto"}
                 </Button>
-              )}
-              <div className={`grid gap-2 ${item.result.gif ? "grid-cols-2" : "grid-cols-1"}`}>
+                {item.result.voice && (
+                  <Button
+                    disabled={generatingVideo}
+                    onClick={handleDownloadVideo}
+                    className="tap-press w-full rounded-full bg-gradient-primary font-bold text-primary-foreground"
+                  >
+                    <Video className="h-4 w-4" />
+                    {generatingVideo ? "Menyiapkan video..." : "Download Foto + Suara"}
+                  </Button>
+                )}
                 {item.result.gif && (
                   <Button
                     variant="outline"
                     disabled={downloadingGif}
                     onClick={handleDownloadGif}
-                    className="tap-press rounded-full font-bold"
+                    className="tap-press w-full rounded-full font-bold"
                   >
                     <Film className="h-4 w-4" />
                     {downloadingGif ? "Menyiapkan..." : "Download GIF"}
@@ -1816,7 +2411,7 @@ function GalleryLightbox({
                   variant="ghost"
                   disabled={deleting}
                   onClick={() => onDelete(item.result.id)}
-                  className="tap-press rounded-full font-bold text-destructive hover:bg-destructive/10"
+                  className="tap-press w-full rounded-full font-bold text-destructive hover:bg-destructive/10"
                 >
                   <Trash2 className="h-4 w-4" /> Hapus
                 </Button>
@@ -1833,19 +2428,23 @@ function CreateSessionDialog({
   frames,
   filters,
   stickers,
+  gifFrames,
   open,
   onOpenChange,
 }: {
   frames: Frame[];
   filters: PhotoFilter[];
   stickers: Sticker[];
+  gifFrames: GifFrame[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
   const queryClient = useQueryClient();
   const [customerName, setCustomerName] = useState("");
+  const [eventDate, setEventDate] = useState("");
   const [frameIds, setFrameIds] = useState<number[]>([]);
   const [frameSearch, setFrameSearch] = useState("");
+  const [gifFrameId, setGifFrameId] = useState<number | null>(null);
   const [filterIds, setFilterIds] = useState<number[]>([]);
   const [stickerIds, setStickerIds] = useState<number[]>([]);
   const [welcomeTitle, setWelcomeTitle] = useState("");
@@ -1868,8 +2467,10 @@ function CreateSessionDialog({
 
   const reset = () => {
     setCustomerName("");
+    setEventDate("");
     setFrameIds([]);
     setFrameSearch("");
+    setGifFrameId(null);
     setFilterIds([]);
     setStickerIds([]);
     setWelcomeTitle("");
@@ -1943,6 +2544,8 @@ function CreateSessionDialog({
               e.preventDefault();
               mutation.mutate({
                 customer_name: customerName,
+                event_date: eventDate || null,
+                gif_frame_id: gifFrameId,
                 frame_ids: frameIds,
                 filter_ids: filterIds,
                 sticker_ids: stickerIds,
@@ -1952,15 +2555,26 @@ function CreateSessionDialog({
             }}
             className="space-y-4"
           >
-            <div className="space-y-1.5">
-              <Label htmlFor="customer-name">Nama customer</Label>
-              <Input
-                id="customer-name"
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                placeholder="cth. Budi & Siti"
-                required
-              />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="customer-name">Nama customer</Label>
+                <Input
+                  id="customer-name"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  placeholder="cth. Budi & Siti"
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="event-date">Tanggal event</Label>
+                <Input
+                  id="event-date"
+                  type="date"
+                  value={eventDate}
+                  onChange={(e) => setEventDate(e.target.value)}
+                />
+              </div>
             </div>
 
             <WelcomeFieldsFieldset
@@ -2009,7 +2623,7 @@ function CreateSessionDialog({
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-bold">{f.name}</span>
                         <span className="block text-xs font-semibold text-muted-foreground">
-                          {f.slots.length} foto · tone {f.tone}
+                          {f.slots.length} foto
                         </span>
                       </span>
                     </button>
@@ -2031,6 +2645,51 @@ function CreateSessionDialog({
                   {frameIds.length} frame dipilih
                 </p>
               )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Frame buat GIF (opsional)</Label>
+              <p className="text-xs font-semibold text-muted-foreground">
+                Pilih salah satu GIF frame dari GIF Manager. Kosongin buat GIF polos tanpa
+                border.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setGifFrameId(null)}
+                  className={`tap-press rounded-xl border-2 px-3 py-2 text-xs font-bold ${
+                    gifFrameId === null
+                      ? "border-primary bg-primary/10"
+                      : "border-border text-muted-foreground hover:bg-muted/70"
+                  }`}
+                >
+                  Tanpa frame
+                </button>
+                {gifFrames
+                  .filter((g) => g.active || g.id === gifFrameId)
+                  .map((g) => (
+                    <button
+                      type="button"
+                      key={g.id}
+                      onClick={() => setGifFrameId(g.id)}
+                      className={`tap-press flex w-16 flex-col items-center gap-1 rounded-xl border-2 p-1.5 ${
+                        gifFrameId === g.id ? "border-primary bg-primary/10" : "border-border"
+                      }`}
+                    >
+                      <div className="grid h-11 w-11 place-items-center rounded-md bg-muted">
+                        <img src={g.image} alt="" className="h-8 w-8 object-contain" />
+                      </div>
+                      <span className="w-full truncate text-center text-[10px] font-bold">
+                        {g.name}
+                      </span>
+                    </button>
+                  ))}
+                {gifFrames.length === 0 && (
+                  <p className="text-xs font-semibold text-muted-foreground">
+                    Belum ada GIF frame — tambahin dulu di menu "GIF Manager".
+                  </p>
+                )}
+              </div>
             </div>
 
             <div className="space-y-1.5">
@@ -2192,7 +2851,7 @@ function FrameForm({
     window.addEventListener("pointerup", onUp);
   };
 
-  const startResize = (e: React.PointerEvent, index: number) => {
+  const startResize = (e: React.PointerEvent, index: number, dir: ResizeDir) => {
     e.preventDefault();
     e.stopPropagation();
     const rect = previewRef.current?.getBoundingClientRect();
@@ -2204,13 +2863,32 @@ function FrameForm({
     setInteracting(true);
 
     const onMove = (ev: PointerEvent) => {
-      const dw = ((ev.clientX - startX) / rect.width) * 100;
-      const dh = ((ev.clientY - startY) / rect.height) * 100;
-      const nw = Math.round(clamp(origin.w + dw, 6, 100 - origin.x));
-      const nh = Math.round(clamp(origin.h + dh, 6, 100 - origin.y));
+      const dxPct = ((ev.clientX - startX) / rect.width) * 100;
+      const dyPct = ((ev.clientY - startY) / rect.height) * 100;
+      let { x, y, w, h } = origin;
+
+      if (dir.includes("e")) {
+        w = clamp(origin.w + dxPct, 6, 100 - origin.x);
+      } else if (dir.includes("w")) {
+        const clampedDx = clamp(dxPct, -origin.x, origin.w - 6);
+        x = origin.x + clampedDx;
+        w = origin.w - clampedDx;
+      }
+      if (dir.includes("s")) {
+        h = clamp(origin.h + dyPct, 6, 100 - origin.y);
+      } else if (dir.includes("n")) {
+        const clampedDy = clamp(dyPct, -origin.y, origin.h - 6);
+        y = origin.y + clampedDy;
+        h = origin.h - clampedDy;
+      }
+
       setDraft((d) => ({
         ...d,
-        slots: d.slots.map((s, i) => (i === index ? { ...s, w: nw, h: nh } : s)),
+        slots: d.slots.map((s, i) =>
+          i === index
+            ? { ...s, x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h) }
+            : s,
+        ),
       }));
     };
     const onUp = () => {
@@ -2241,7 +2919,7 @@ function FrameForm({
     <div className="grid gap-8 md:grid-cols-[340px_minmax(0,1fr)]">
       <div>
         <p className="mb-2 text-xs font-bold text-muted-foreground">
-          Preview slot <span className="font-semibold text-muted-foreground/70">— geser & tarik sudutnya buat atur posisi</span>
+          Preview slot <span className="font-semibold text-muted-foreground/70">— geser & tarik titik di sudut/sisi buat atur ukuran</span>
         </p>
         <div ref={previewRef} className="relative touch-none select-none">
           <FrameComposite
@@ -2258,12 +2936,14 @@ function FrameForm({
                 style={{ left: `${s.x}%`, top: `${s.y}%`, width: `${s.w}%`, height: `${s.h}%` }}
                 className="absolute cursor-move touch-none"
               >
-                {i === activeSlot && (
-                  <div
-                    onPointerDown={(e) => startResize(e, i)}
-                    className="tap-press absolute -bottom-2 -right-2 h-5 w-5 cursor-nwse-resize touch-none rounded-full border-2 border-card bg-primary shadow-md"
-                  />
-                )}
+                {i === activeSlot &&
+                  RESIZE_HANDLES.map(({ dir, className }) => (
+                    <div
+                      key={dir}
+                      onPointerDown={(e) => startResize(e, i, dir)}
+                      className={`tap-press absolute h-4 w-4 touch-none rounded-full border-2 border-card bg-primary shadow-md ${className}`}
+                    />
+                  ))}
               </div>
             ))}
           </div>
@@ -2314,31 +2994,16 @@ function FrameForm({
           />
         </div>
 
-        <div className="space-y-1.5 sm:max-w-xs">
-          <Label>Warna kertas frame</Label>
-          <Select
-            value={draft.tone}
-            onValueChange={(v) => setDraft({ ...draft, tone: v as Frame["tone"] })}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {TONES.map((t) => (
-                <SelectItem key={t} value={t}>
-                  {t}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
         <div className="space-y-2">
           <Label>Gambar frame</Label>
           <div className="rounded-2xl border-2 border-dashed border-border p-5 text-center">
             <Upload className="mx-auto h-5 w-5 text-muted-foreground" />
             <p className="mt-2 text-xs font-semibold text-muted-foreground">
               Upload PNG transparan sendiri, atau pilih aset contoh
+            </p>
+            <p className="mt-1 text-[11px] font-medium text-muted-foreground/70">
+              Rasio 2:3 (4R, cth. 1000×1500px) hasilnya paling pas — rasio lain tetap dipakai
+              utuh, tanpa terpotong
             </p>
             <input
               ref={fileInputRef}

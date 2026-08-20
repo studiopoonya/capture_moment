@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { ArrowLeft, RefreshCw, SwitchCamera, VideoOff } from "lucide-react";
+import { ArrowLeft, RefreshCw, SwitchCamera, VideoOff, Zap, ZapOff } from "lucide-react";
 import type { Frame } from "@/lib/api";
 import { usePhotobooth, type Shot } from "@/lib/photobooth-store";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,10 @@ type Props = {
   onBack?: () => void;
 };
 
+/** Torch is a non-standard capability — not in lib.dom's MediaTrack* types. */
+type TorchCapabilities = MediaTrackCapabilities & { torch?: boolean };
+type TorchConstraintSet = MediaTrackConstraintSet & { torch?: boolean };
+
 export function PhotoboothCapture({ frame, sessionKey, eyebrow, onDone, onBack }: Props) {
   const { shots: allShots, setShots } = usePhotobooth();
   const taken: Shot[] = allShots[sessionKey] ?? [];
@@ -23,6 +27,8 @@ export function PhotoboothCapture({ frame, sessionKey, eyebrow, onDone, onBack }
   const [flash, setFlash] = useState(false);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [torchSupported, setTorchSupported] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
@@ -35,6 +41,8 @@ export function PhotoboothCapture({ frame, sessionKey, eyebrow, onDone, onBack }
 
     async function startCamera() {
       setCameraError(null);
+      setTorchSupported(false);
+      setTorchOn(false);
       streamRef.current?.getTracks().forEach((track) => track.stop());
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -52,6 +60,9 @@ export function PhotoboothCapture({ frame, sessionKey, eyebrow, onDone, onBack }
         }
         streamRef.current = stream;
         if (videoRef.current) videoRef.current.srcObject = stream;
+        const track = stream.getVideoTracks()[0];
+        const capabilities = track?.getCapabilities?.() as TorchCapabilities | undefined;
+        setTorchSupported(!!capabilities?.torch);
       } catch (err) {
         setCameraError(
           err instanceof Error
@@ -67,6 +78,19 @@ export function PhotoboothCapture({ frame, sessionKey, eyebrow, onDone, onBack }
       streamRef.current?.getTracks().forEach((track) => track.stop());
     };
   }, [facingMode, done]);
+
+  const toggleTorch = async () => {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track) return;
+    try {
+      const nextOn = !torchOn;
+      const constraints: { advanced: TorchConstraintSet[] } = { advanced: [{ torch: nextOn }] };
+      await track.applyConstraints(constraints as MediaTrackConstraints);
+      setTorchOn(nextOn);
+    } catch {
+      // Some browsers report the torch capability but reject the constraint anyway — no-op.
+    }
+  };
 
   const capturePhoto = (): string | null => {
     const video = videoRef.current;
@@ -129,13 +153,27 @@ export function PhotoboothCapture({ frame, sessionKey, eyebrow, onDone, onBack }
             Foto {Math.min(taken.length + 1, total)} dari {total}
           </p>
         </div>
-        <button
-          onClick={() => setFacingMode((m) => (m === "user" ? "environment" : "user"))}
-          aria-label="Ganti kamera"
-          className="grid h-10 w-10 place-items-center rounded-2xl bg-card/15 text-foreground"
-        >
-          <SwitchCamera className="h-4 w-4" />
-        </button>
+        <div className="flex items-center gap-2">
+          {torchSupported && (
+            <button
+              onClick={toggleTorch}
+              aria-label={torchOn ? "Matikan flash" : "Nyalakan flash"}
+              className={cn(
+                "grid h-10 w-10 place-items-center rounded-2xl text-foreground",
+                torchOn ? "bg-primary text-primary-foreground" : "bg-card/15",
+              )}
+            >
+              {torchOn ? <Zap className="h-4 w-4" /> : <ZapOff className="h-4 w-4" />}
+            </button>
+          )}
+          <button
+            onClick={() => setFacingMode((m) => (m === "user" ? "environment" : "user"))}
+            aria-label="Ganti kamera"
+            className="grid h-10 w-10 place-items-center rounded-2xl bg-card/15 text-foreground"
+          >
+            <SwitchCamera className="h-4 w-4" />
+          </button>
+        </div>
       </header>
 
       <div className="px-5">

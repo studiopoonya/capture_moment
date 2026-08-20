@@ -35,6 +35,7 @@ import {
   generateSessionResultVideo,
   uploadSessionResult,
   type Frame,
+  type GifFrame,
   type PhotoFilter,
   type Sticker,
 } from "@/lib/api";
@@ -95,6 +96,8 @@ type Props = {
   stickers?: Sticker[];
   /** When set (customer-session flow only), the finished shot is auto-uploaded to the admin gallery. */
   sessionId?: number;
+  /** Optional reusable GIF-border asset to frame each photo in the generated GIF — unset/null means no border. */
+  gifFrame?: GifFrame | null;
 };
 
 export function PhotoboothResult({
@@ -106,6 +109,7 @@ export function PhotoboothResult({
   filters,
   stickers,
   sessionId,
+  gifFrame,
 }: Props) {
   const { shots } = usePhotobooth();
   const taken = shots[sessionKey] ?? [];
@@ -258,8 +262,13 @@ export function PhotoboothResult({
 
       setGifGenerating(true);
       try {
-        const blob = await composeResultGif(frame, taken, activeFilter.css, placedStickers, (p) =>
-          setGifProgress(Math.round(p * 100)),
+        const blob = await composeResultGif(
+          frame,
+          taken,
+          activeFilter.css,
+          placedStickers,
+          (p) => setGifProgress(Math.round(p * 100)),
+          gifFrame,
         );
         setGifBlob(blob);
         setGifUrl(URL.createObjectURL(blob));
@@ -583,7 +592,10 @@ export function PhotoboothResult({
               )}
             </div>
           ) : (
-            <div ref={compositeRef} className="relative touch-none select-none">
+            <div
+              ref={compositeRef}
+              className={`relative select-none ${interactive ? "touch-none" : ""}`}
+            >
               <FrameComposite frame={frame} shots={taken} filterCss={activeFilter.css} />
               <div
                 className="absolute inset-0"

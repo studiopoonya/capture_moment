@@ -1,6 +1,6 @@
 import GIF from "gif.js";
 import { API_URL } from "@/lib/api";
-import type { Frame } from "@/lib/api";
+import type { Frame, GifFrame } from "@/lib/api";
 import type { Shot } from "@/lib/photobooth-store";
 
 /**
@@ -106,7 +106,7 @@ async function loadFrameAssets(frame: Frame, shots: Shot[]) {
  * `filterCss` is scoped to the photos only — the frame graphic is never color-graded. */
 function drawFrameLayer(
   ctx: CanvasRenderingContext2D,
-  frame: Frame,
+  frame: Pick<Frame, "slots" | "rounded">,
   shotImgs: (HTMLImageElement | null)[],
   frameImg: HTMLImageElement,
   width: number,
@@ -239,6 +239,41 @@ async function renderIndividualPhoto(
   return canvas;
 }
 
+/** Same output shape as renderIndividualPhoto, but when a gifFrame is given, the photo is
+ * clipped into its slot rect (percent-based, like a regular Frame's single slot) and the
+ * border image is multiply-blended everywhere *outside* that rect — reusing drawFrameLayer's
+ * masking so a bordered frame design doesn't tint the photo underneath. */
+async function renderGifFrame(
+  img: HTMLImageElement,
+  filterCss: string,
+  slotStickers: PlacedSticker[],
+  width: number,
+  height: number,
+  gifFrame: Pick<GifFrame, "slot_x" | "slot_y" | "slot_w" | "slot_h" | "rounded"> | null,
+  gifFrameImg: HTMLImageElement | null,
+): Promise<HTMLCanvasElement> {
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas tidak didukung di browser ini");
+
+  if (gifFrame && gifFrameImg) {
+    const syntheticFrame = {
+      slots: [{ id: "gif", x: gifFrame.slot_x, y: gifFrame.slot_y, w: gifFrame.slot_w, h: gifFrame.slot_h }],
+      rounded: gifFrame.rounded,
+    };
+    drawFrameLayer(ctx, syntheticFrame, [img], gifFrameImg, width, height, new Set([0]), filterCss);
+  } else {
+    if (filterCss) ctx.filter = filterCss;
+    drawCover(ctx, img, 0, 0, width, height);
+    ctx.filter = "none";
+  }
+
+  await drawStickers(ctx, slotStickers, width, height, STICKER_BASE_PX * (width / 420));
+  return canvas;
+}
+
 function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality?: number): Promise<Blob> {
   return new Promise((resolve, reject) => {
     canvas.toBlob(
@@ -280,8 +315,10 @@ export async function composeResultImage(
 }
 
 /**
- * Renders a looping GIF that cycles through each captured photo full-frame (no paper
- * border), like a simple slideshow — photo 1 → photo 2 → ... → back to photo 1.
+ * Renders a looping GIF that cycles through each captured photo, like a simple slideshow —
+ * photo 1 → photo 2 → ... → back to photo 1. When `gifFrame` is given, each photo is clipped
+ * into its slot and bordered with that frame's graphic; otherwise photos are shown full-frame
+ * with no border, same as before.
  */
 export async function composeResultGif(
   frame: Frame,
@@ -289,6 +326,7 @@ export async function composeResultGif(
   filterCss: string,
   stickers: PlacedSticker[],
   onProgress?: (percent: number) => void,
+  gifFrame?: GifFrame | null,
 ): Promise<Blob> {
   const shotImgs = await Promise.all(
     frame.slots.map((_, i) => (shots[i] ? loadImage(shots[i]!.dataUrl) : null)),
@@ -297,6 +335,7 @@ export async function composeResultGif(
   if (filledSlots.length === 0) throw new Error("Belum ada foto buat dibikin GIF");
 
   const stickersBySlot = groupStickersBySlot(frame, stickers);
+  const gifFrameImg = gifFrame ? await loadImage(toCanvasSafeUrl(gifFrame.image)) : null;
 
   const gif = new GIF({
     workers: 2,
@@ -307,12 +346,14 @@ export async function composeResultGif(
   });
 
   for (const slotIndex of filledSlots) {
-    const canvas = await renderIndividualPhoto(
+    const canvas = await renderGifFrame(
       shotImgs[slotIndex]!,
       filterCss,
       stickersBySlot.get(slotIndex) ?? [],
       GIF_WIDTH,
       GIF_HEIGHT,
+      gifFrame ?? null,
+      gifFrameImg,
     );
     gif.addFrame(canvas, { delay: 900 });
   }

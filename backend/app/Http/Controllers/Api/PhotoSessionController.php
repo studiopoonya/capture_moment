@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Frame;
 use App\Models\PhotoFilter;
 use App\Models\PhotoSession;
 use App\Models\Sticker;
@@ -13,7 +12,7 @@ use Illuminate\Support\Str;
 
 class PhotoSessionController extends Controller
 {
-    private const RELATIONS = ['frames', 'filters', 'stickers'];
+    private const RELATIONS = ['frames', 'filters', 'stickers', 'gifFrame'];
 
     /** Admin: every session, newest first, for management. */
     public function index()
@@ -25,6 +24,8 @@ class PhotoSessionController extends Controller
     {
         $data = $request->validate([
             'customer_name' => ['required', 'string', 'max:255'],
+            'event_date' => ['sometimes', 'nullable', 'date'],
+            'gif_frame_id' => ['sometimes', 'nullable', 'exists:gif_frames,id'],
             'frame_ids' => ['required', 'array', 'min:1'],
             'frame_ids.*' => ['exists:frames,id'],
             'filter_ids' => ['sometimes', 'array'],
@@ -38,6 +39,8 @@ class PhotoSessionController extends Controller
         $session = PhotoSession::create([
             'customer_name' => $data['customer_name'],
             'slug' => $this->uniqueSlug($data['customer_name']),
+            'event_date' => $data['event_date'] ?? null,
+            'gif_frame_id' => $data['gif_frame_id'] ?? null,
             'welcome_photo' => $data['welcome_photo'] ?? null,
             'welcome_title' => $data['welcome_title'] ?? null,
         ]);
@@ -62,6 +65,8 @@ class PhotoSessionController extends Controller
     {
         $data = $request->validate([
             'customer_name' => ['sometimes', 'required', 'string', 'max:255'],
+            'event_date' => ['sometimes', 'nullable', 'date'],
+            'gif_frame_id' => ['sometimes', 'nullable', 'exists:gif_frames,id'],
             'frame_ids' => ['sometimes', 'required', 'array', 'min:1'],
             'frame_ids.*' => ['exists:frames,id'],
             'filter_ids' => ['sometimes', 'array'],
@@ -75,7 +80,7 @@ class PhotoSessionController extends Controller
         // The slug stays put on rename — it's already baked into a shared link.
         $session->update(array_filter(
             $data,
-            fn ($key) => in_array($key, ['customer_name', 'welcome_photo', 'welcome_title'], true),
+            fn ($key) => in_array($key, ['customer_name', 'event_date', 'gif_frame_id', 'welcome_photo', 'welcome_title'], true),
             ARRAY_FILTER_USE_KEY,
         ));
 
@@ -101,6 +106,18 @@ class PhotoSessionController extends Controller
         $session = PhotoSession::with(self::RELATIONS)->where('slug', $slug)->firstOrFail();
 
         return $session;
+    }
+
+    /**
+     * Public: view-only gallery for the "Bagikan Semua" link in the admin gallery — every result
+     * for this session, no delete route reachable from here, no session management data (frames/
+     * filters/stickers) exposed.
+     */
+    public function showSharedGallery(string $token)
+    {
+        return PhotoSession::where('share_token', $token)
+            ->with('results.frame')
+            ->firstOrFail();
     }
 
     public function destroy(PhotoSession $session)
