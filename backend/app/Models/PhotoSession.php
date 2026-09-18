@@ -20,6 +20,7 @@ class PhotoSession extends Model
         'gif_frame_id',
         'welcome_photo',
         'welcome_title',
+        'welcome_message',
     ];
 
     protected function casts(): array

@@ -86,7 +86,16 @@ export async function logout() {
   }
 }
 
-export type Slot = { id: string; x: number; y: number; w: number; h: number };
+export type Slot = {
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** Slots sharing the same shotGroup number reuse one captured photo instead of taking a
+   * separate shot each — unset means the slot is its own group (today's default: 1 photo per slot). */
+  shotGroup?: number;
+};
 
 export type Frame = {
   id: number;
@@ -126,17 +135,13 @@ export type PhotoSession = {
   gif_frame: GifFrame | null;
   welcome_photo: string | null;
   welcome_title: string | null;
+  welcome_message: string | null;
   frames: Frame[];
   filters: PhotoFilter[];
   stickers: Sticker[];
   results?: PhotoSessionResult[];
   created_at: string;
 };
-
-/** Public: active frames only, for the customer-facing frame picker. */
-export function getFrames() {
-  return request<Frame[]>("/frames");
-}
 
 /** Admin: every frame regardless of active state. */
 export function getAdminFrames() {
@@ -162,11 +167,6 @@ export function uploadFrameImage(file: File): Promise<{ url: string }> {
 }
 
 export type PhotoFilter = { id: number; name: string; css: string; active: boolean };
-
-/** Public: active filters only. */
-export function getFilters() {
-  return request<PhotoFilter[]>("/filters");
-}
 
 /** Admin: every filter regardless of active state. */
 export function getAdminFilters() {
@@ -194,11 +194,6 @@ export function deleteFilter(id: number) {
 }
 
 export type Sticker = { id: number; name: string; image: string; active: boolean };
-
-/** Public: active stickers only. */
-export function getStickers() {
-  return request<Sticker[]>("/stickers");
-}
 
 /** Admin: every sticker regardless of active state. */
 export function getAdminStickers() {
@@ -295,6 +290,7 @@ export function createSession(data: {
   sticker_ids?: number[];
   welcome_photo?: string | null;
   welcome_title?: string | null;
+  welcome_message?: string | null;
 }) {
   return request<PhotoSession>("/sessions", { method: "POST", body: JSON.stringify(data) });
 }
@@ -310,6 +306,7 @@ export function updateSession(
     sticker_ids?: number[];
     welcome_photo?: string | null;
     welcome_title?: string | null;
+    welcome_message?: string | null;
   },
 ) {
   return request<PhotoSession>(`/sessions/${id}`, { method: "PUT", body: JSON.stringify(data) });

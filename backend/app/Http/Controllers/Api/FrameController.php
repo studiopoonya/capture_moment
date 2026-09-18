@@ -10,12 +10,6 @@ use Illuminate\Support\Str;
 
 class FrameController extends Controller
 {
-    /** Public: active frames only, for the customer-facing frame picker. */
-    public function index()
-    {
-        return Frame::where('active', true)->orderByDesc('id')->get();
-    }
-
     /** Admin: every frame regardless of active state. */
     public function adminIndex()
     {
@@ -35,6 +29,7 @@ class FrameController extends Controller
             'slots.*.y' => ['required', 'numeric'],
             'slots.*.w' => ['required', 'numeric'],
             'slots.*.h' => ['required', 'numeric'],
+            'slots.*.shotGroup' => ['sometimes', 'nullable', 'integer', 'min:1'],
         ]);
 
         return Frame::create($data);
@@ -53,6 +48,7 @@ class FrameController extends Controller
             'slots.*.y' => ['required_with:slots', 'numeric'],
             'slots.*.w' => ['required_with:slots', 'numeric'],
             'slots.*.h' => ['required_with:slots', 'numeric'],
+            'slots.*.shotGroup' => ['sometimes', 'nullable', 'integer', 'min:1'],
         ]);
 
         $frame->update($data);

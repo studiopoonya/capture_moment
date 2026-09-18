@@ -11,12 +11,6 @@ use Illuminate\Support\Str;
 
 class FilterController extends Controller
 {
-    /** Public: active filters only. */
-    public function index()
-    {
-        return PhotoFilter::where('active', true)->orderByDesc('id')->get();
-    }
-
     /** Admin: every filter regardless of active state. */
     public function adminIndex()
     {

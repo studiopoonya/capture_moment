@@ -13,8 +13,6 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as CustomerSlugRouteImport } from './routes/$customerSlug'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as LoginRouteImport } from './routes/login'
-import { Route as CaptureFrameIdRouteImport } from './routes/capture.$frameId'
-import { Route as ResultFrameIdRouteImport } from './routes/result.$frameId'
 import { Route as SharedSessionsTokenRouteImport } from './routes/shared-sessions.$token'
 
 const IndexRoute = IndexRouteImport.update({
@@ -37,16 +35,6 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const CaptureFrameIdRoute = CaptureFrameIdRouteImport.update({
-  id: '/capture/$frameId',
-  path: '/capture/$frameId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ResultFrameIdRoute = ResultFrameIdRouteImport.update({
-  id: '/result/$frameId',
-  path: '/result/$frameId',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const SharedSessionsTokenRoute = SharedSessionsTokenRouteImport.update({
   id: '/shared-sessions/$token',
   path: '/shared-sessions/$token',
@@ -58,8 +46,6 @@ export interface FileRoutesByFullPath {
   '/$customerSlug': typeof CustomerSlugRoute
   '/admin': typeof AdminRoute
   '/login': typeof LoginRoute
-  '/capture/$frameId': typeof CaptureFrameIdRoute
-  '/result/$frameId': typeof ResultFrameIdRoute
   '/shared-sessions/$token': typeof SharedSessionsTokenRoute
 }
 export interface FileRoutesByTo {
@@ -67,8 +53,6 @@ export interface FileRoutesByTo {
   '/$customerSlug': typeof CustomerSlugRoute
   '/admin': typeof AdminRoute
   '/login': typeof LoginRoute
-  '/capture/$frameId': typeof CaptureFrameIdRoute
-  '/result/$frameId': typeof ResultFrameIdRoute
   '/shared-sessions/$token': typeof SharedSessionsTokenRoute
 }
 export interface FileRoutesById {
@@ -77,37 +61,20 @@ export interface FileRoutesById {
   '/$customerSlug': typeof CustomerSlugRoute
   '/admin': typeof AdminRoute
   '/login': typeof LoginRoute
-  '/capture/$frameId': typeof CaptureFrameIdRoute
-  '/result/$frameId': typeof ResultFrameIdRoute
   '/shared-sessions/$token': typeof SharedSessionsTokenRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    | '/'
-    | '/$customerSlug'
-    | '/admin'
-    | '/login'
-    | '/capture/$frameId'
-    | '/result/$frameId'
-    | '/shared-sessions/$token'
+    '/' | '/$customerSlug' | '/admin' | '/login' | '/shared-sessions/$token'
   fileRoutesByTo: FileRoutesByTo
-  to:
-    | '/'
-    | '/$customerSlug'
-    | '/admin'
-    | '/login'
-    | '/capture/$frameId'
-    | '/result/$frameId'
-    | '/shared-sessions/$token'
+  to: '/' | '/$customerSlug' | '/admin' | '/login' | '/shared-sessions/$token'
   id:
     | '__root__'
     | '/'
     | '/$customerSlug'
     | '/admin'
     | '/login'
-    | '/capture/$frameId'
-    | '/result/$frameId'
     | '/shared-sessions/$token'
   fileRoutesById: FileRoutesById
 }
@@ -116,8 +83,6 @@ export interface RootRouteChildren {
   CustomerSlugRoute: typeof CustomerSlugRoute
   AdminRoute: typeof AdminRoute
   LoginRoute: typeof LoginRoute
-  CaptureFrameIdRoute: typeof CaptureFrameIdRoute
-  ResultFrameIdRoute: typeof ResultFrameIdRoute
   SharedSessionsTokenRoute: typeof SharedSessionsTokenRoute
 }
 
@@ -151,20 +116,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/capture/$frameId': {
-      id: '/capture/$frameId'
-      path: '/capture/$frameId'
-      fullPath: '/capture/$frameId'
-      preLoaderRoute: typeof CaptureFrameIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/result/$frameId': {
-      id: '/result/$frameId'
-      path: '/result/$frameId'
-      fullPath: '/result/$frameId'
-      preLoaderRoute: typeof ResultFrameIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/shared-sessions/$token': {
       id: '/shared-sessions/$token'
       path: '/shared-sessions/$token'
@@ -180,8 +131,6 @@ const rootRouteChildren: RootRouteChildren = {
   CustomerSlugRoute: CustomerSlugRoute,
   AdminRoute: AdminRoute,
   LoginRoute: LoginRoute,
-  CaptureFrameIdRoute: CaptureFrameIdRoute,
-  ResultFrameIdRoute: ResultFrameIdRoute,
   SharedSessionsTokenRoute: SharedSessionsTokenRoute,
 }
 export const routeTree = rootRouteImport

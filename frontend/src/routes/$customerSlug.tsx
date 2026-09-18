@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Sparkles } from "lucide-react";
 import { getSession } from "@/lib/api";
+import { captureSlots } from "@/lib/frame-slots";
 import { usePhotobooth } from "@/lib/photobooth-store";
 import { PhotoboothCapture } from "@/components/PhotoboothCapture";
 import { PhotoboothResult } from "@/components/PhotoboothResult";
@@ -70,6 +71,7 @@ function CustomerSessionPage() {
       <WelcomeScreen
         photoUrl={session.welcome_photo}
         title={session.welcome_title}
+        message={session.welcome_message}
         customerName={session.customer_name}
         onContinue={() => setWelcomeSeen(true)}
       />
@@ -107,7 +109,7 @@ function CustomerSessionPage() {
                 <div className="min-w-0">
                   <p className="truncate font-display text-base font-extrabold">{f.name}</p>
                   <p className="text-xs font-semibold text-muted-foreground">
-                    {f.slots.length} foto
+                    {captureSlots(f).length} foto
                   </p>
                 </div>
               </button>
@@ -120,7 +122,7 @@ function CustomerSessionPage() {
 
   const sessionKey = `${customerSlug}-${selectedFrame.id}`;
   const taken = shots[sessionKey] ?? [];
-  const done = taken.length >= selectedFrame.slots.length;
+  const done = taken.length >= captureSlots(selectedFrame).length;
 
   if (done) {
     return (

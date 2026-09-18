@@ -10,12 +10,6 @@ use Illuminate\Support\Str;
 
 class StickerController extends Controller
 {
-    /** Public: active stickers only. */
-    public function index()
-    {
-        return Sticker::where('active', true)->orderByDesc('id')->get();
-    }
-
     /** Admin: every sticker regardless of active state. */
     public function adminIndex()
     {

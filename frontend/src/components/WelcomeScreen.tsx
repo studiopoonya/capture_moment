@@ -4,9 +4,13 @@ import { FloatingSparkles } from "@/components/FloatingSparkles";
 type Props = {
   photoUrl?: string | null;
   title?: string | null;
+  message?: string | null;
   customerName: string;
   onContinue: () => void;
 };
+
+export const DEFAULT_WELCOME_MESSAGE =
+  "Terima kasih sudah hadir merayakan hari bahagia kami. Abadikan momenmu di sini ✨";
 
 /**
  * Full-bleed "Happy Wedding" moment shown once a guest opens their session link,
@@ -18,8 +22,9 @@ type Props = {
  * instantly to its end state in this project (reproduced in both dev and production builds),
  * so CSS animations are the reliable path here.
  */
-export function WelcomeScreen({ photoUrl, title, customerName, onContinue }: Props) {
+export function WelcomeScreen({ photoUrl, title, message, customerName, onContinue }: Props) {
   const headline = title?.trim() || `Happy Wedding ${customerName}`;
+  const body = message?.trim() || DEFAULT_WELCOME_MESSAGE;
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#1a0f0f]">
@@ -84,7 +89,7 @@ export function WelcomeScreen({ photoUrl, title, customerName, onContinue }: Pro
           className="animate-fade-up mt-5 max-w-xs text-sm font-medium text-white/75"
           style={{ animationDelay: "0.5s" }}
         >
-          Terima kasih sudah hadir merayakan hari bahagia kami. Abadikan momenmu di sini ✨
+          {body}
         </p>
 
         <button

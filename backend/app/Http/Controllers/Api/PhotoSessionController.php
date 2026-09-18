@@ -34,6 +34,7 @@ class PhotoSessionController extends Controller
             'sticker_ids.*' => ['exists:stickers,id'],
             'welcome_photo' => ['sometimes', 'nullable', 'string'],
             'welcome_title' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'welcome_message' => ['sometimes', 'nullable', 'string', 'max:500'],
         ]);
 
         $session = PhotoSession::create([
@@ -43,6 +44,7 @@ class PhotoSessionController extends Controller
             'gif_frame_id' => $data['gif_frame_id'] ?? null,
             'welcome_photo' => $data['welcome_photo'] ?? null,
             'welcome_title' => $data['welcome_title'] ?? null,
+            'welcome_message' => $data['welcome_message'] ?? null,
         ]);
 
         $session->frames()->attach($data['frame_ids']);
@@ -75,12 +77,13 @@ class PhotoSessionController extends Controller
             'sticker_ids.*' => ['exists:stickers,id'],
             'welcome_photo' => ['sometimes', 'nullable', 'string'],
             'welcome_title' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'welcome_message' => ['sometimes', 'nullable', 'string', 'max:500'],
         ]);
 
         // The slug stays put on rename — it's already baked into a shared link.
         $session->update(array_filter(
             $data,
-            fn ($key) => in_array($key, ['customer_name', 'event_date', 'gif_frame_id', 'welcome_photo', 'welcome_title'], true),
+            fn ($key) => in_array($key, ['customer_name', 'event_date', 'gif_frame_id', 'welcome_photo', 'welcome_title', 'welcome_message'], true),
             ARRAY_FILTER_USE_KEY,
         ));
 

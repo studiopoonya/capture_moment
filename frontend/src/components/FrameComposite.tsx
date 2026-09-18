@@ -1,6 +1,7 @@
 import { useId } from "react";
 import { cn } from "@/lib/utils";
 import type { Frame } from "@/lib/api";
+import { buildSlotShotMap } from "@/lib/frame-slots";
 import type { Shot } from "@/lib/photobooth-store";
 
 type Props = {
@@ -27,11 +28,14 @@ export function FrameComposite({
   filterCss,
 }: Props) {
   const maskId = useId();
+  // Slots sharing a shotGroup reuse one captured photo (e.g. 6 boxes filled by 3 shutter
+  // presses) — resolve each slot's own shots-array index instead of assuming 1:1 position.
+  const slotShotMap = buildSlotShotMap(frame);
   // Some frame graphics (esp. JPGs) have no transparent window over the photo area, so
   // multiply-blending them full-bleed would permanently tint every photo underneath —
   // mask out the slots that currently hold a photo so the frame paper only colors its
   // own border/decoration, never the photo itself.
-  const filledSlots = frame.slots.filter((_, i) => shots[i]);
+  const filledSlots = frame.slots.filter((_, i) => shots[slotShotMap[i]!]);
 
   return (
     <div
@@ -42,7 +46,7 @@ export function FrameComposite({
       )}
     >
       {frame.slots.map((slot, i) => {
-        const shot = shots[i];
+        const shot = shots[slotShotMap[i]!];
         if (!shot && hideEmptySlots) return null;
         const isActive = activeSlotIndex === i;
         return (

@@ -1,6 +1,7 @@
 import GIF from "gif.js";
 import { API_URL } from "@/lib/api";
 import type { Frame, GifFrame } from "@/lib/api";
+import { buildSlotShotMap } from "@/lib/frame-slots";
 import type { Shot } from "@/lib/photobooth-store";
 
 /**
@@ -95,9 +96,15 @@ function drawCover(
 }
 
 async function loadFrameAssets(frame: Frame, shots: Shot[]) {
+  const slotShotMap = buildSlotShotMap(frame);
   const [frameImg, shotImgs] = await Promise.all([
     loadImage(toCanvasSafeUrl(frame.image)),
-    Promise.all(frame.slots.map((_, i) => (shots[i] ? loadImage(shots[i]!.dataUrl) : null))),
+    Promise.all(
+      frame.slots.map((_, i) => {
+        const shot = shots[slotShotMap[i]!];
+        return shot ? loadImage(shot.dataUrl) : null;
+      }),
+    ),
   ]);
   return { frameImg, shotImgs };
 }
@@ -328,8 +335,12 @@ export async function composeResultGif(
   onProgress?: (percent: number) => void,
   gifFrame?: GifFrame | null,
 ): Promise<Blob> {
+  const slotShotMap = buildSlotShotMap(frame);
   const shotImgs = await Promise.all(
-    frame.slots.map((_, i) => (shots[i] ? loadImage(shots[i]!.dataUrl) : null)),
+    frame.slots.map((_, i) => {
+      const shot = shots[slotShotMap[i]!];
+      return shot ? loadImage(shot.dataUrl) : null;
+    }),
   );
   const filledSlots = frame.slots.map((_, i) => i).filter((i) => shotImgs[i]);
   if (filledSlots.length === 0) throw new Error("Belum ada foto buat dibikin GIF");
@@ -379,8 +390,12 @@ export async function composeIndividualPhotos(
   filterCss: string,
   stickers: PlacedSticker[],
 ): Promise<Blob[]> {
+  const slotShotMap = buildSlotShotMap(frame);
   const shotImgs = await Promise.all(
-    frame.slots.map((_, i) => (shots[i] ? loadImage(shots[i]!.dataUrl) : null)),
+    frame.slots.map((_, i) => {
+      const shot = shots[slotShotMap[i]!];
+      return shot ? loadImage(shot.dataUrl) : null;
+    }),
   );
   const filledSlots = frame.slots.map((_, i) => i).filter((i) => shotImgs[i]);
   if (filledSlots.length === 0) throw new Error("Belum ada foto");

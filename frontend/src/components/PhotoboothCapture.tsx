@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft, RefreshCw, SwitchCamera, VideoOff, Zap, ZapOff } from "lucide-react";
 import type { Frame } from "@/lib/api";
+import { captureSlots } from "@/lib/frame-slots";
 import { usePhotobooth, type Shot } from "@/lib/photobooth-store";
 import { cn } from "@/lib/utils";
 
@@ -29,15 +30,44 @@ export function PhotoboothCapture({ frame, sessionKey, eyebrow, onDone, onBack }
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [torchSupported, setTorchSupported] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
+  const [retryToken, setRetryToken] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  const total = frame.slots.length;
+  // A slot's shotGroup lets several visual boxes share one photo (e.g. 6 boxes, 3 shutter
+  // presses) — the camera flow only cares about these distinct capture points, never the
+  // full slot layout.
+  const shootSlots = captureSlots(frame);
+  const total = shootSlots.length;
   const done = taken.length >= total;
+  // The slot about to be filled, so the customer can see what will actually end up in the
+  // frame — handy when the frame is portrait but a wide group shot won't fully fit, so people
+  // on the edges would otherwise get cropped out without warning.
+  const nextSlot = shootSlots[taken.length];
+  // Slot x/y/w/h are percentages of the frame's fixed 2:3 (1000×1500) composite canvas, so a
+  // slot's real aspect ratio also carries that 2:3 factor, not just its own w:h percentages.
+  const cropAspect = nextSlot ? (nextSlot.w / nextSlot.h) * (2 / 3) : null;
+  const showCropGuide = !cameraError && cropAspect !== null;
 
   useEffect(() => {
     if (done) return;
     let cancelled = false;
+    // Some in-app browsers (WhatsApp/Instagram) grant the camera stream but never actually
+    // start playback — no error is thrown, the preview just stays blank forever. Treat that
+    // as a failure too, instead of leaving the customer stuck with no feedback at all.
+    let stuckTimer: ReturnType<typeof setTimeout> | null = null;
+    let attachedVideo: HTMLVideoElement | null = null;
+
+    const clearStuckTimer = () => {
+      if (stuckTimer) {
+        clearTimeout(stuckTimer);
+        stuckTimer = null;
+      }
+    };
+    const onPlaying = () => {
+      clearStuckTimer();
+      setCameraError(null);
+    };
 
     async function startCamera() {
       setCameraError(null);
@@ -59,11 +89,31 @@ export function PhotoboothCapture({ frame, sessionKey, eyebrow, onDone, onBack }
           return;
         }
         streamRef.current = stream;
-        if (videoRef.current) videoRef.current.srcObject = stream;
+
+        stuckTimer = setTimeout(() => {
+          if (!cancelled) {
+            setCameraError("Kamera gak kunjung muncul. Coba lagi, atau refresh halaman ini.");
+          }
+        }, 6000);
+
+        const video = videoRef.current;
+        if (video) {
+          attachedVideo = video;
+          video.addEventListener("playing", onPlaying);
+          video.srcObject = stream;
+          try {
+            await video.play();
+          } catch {
+            // autoplay can be rejected in some in-app browsers — the stuck-timer above
+            // catches this too, but retrying play() immediately often just works.
+          }
+        }
+
         const track = stream.getVideoTracks()[0];
         const capabilities = track?.getCapabilities?.() as TorchCapabilities | undefined;
         setTorchSupported(!!capabilities?.torch);
       } catch (err) {
+        clearStuckTimer();
         setCameraError(
           err instanceof Error
             ? err.message
@@ -75,9 +125,13 @@ export function PhotoboothCapture({ frame, sessionKey, eyebrow, onDone, onBack }
     startCamera();
     return () => {
       cancelled = true;
+      clearStuckTimer();
+      attachedVideo?.removeEventListener("playing", onPlaying);
       streamRef.current?.getTracks().forEach((track) => track.stop());
     };
-  }, [facingMode, done]);
+  }, [facingMode, done, retryToken]);
+
+  const retryCamera = () => setRetryToken((n) => n + 1);
 
   const toggleTorch = async () => {
     const track = streamRef.current?.getVideoTracks()[0];
@@ -113,7 +167,7 @@ export function PhotoboothCapture({ frame, sessionKey, eyebrow, onDone, onBack }
     if (countdown === 0) {
       const dataUrl = capturePhoto();
       if (dataUrl) {
-        const shot: Shot = { slotId: frame.slots[taken.length]!.id, dataUrl };
+        const shot: Shot = { slotId: shootSlots[taken.length]!.id, dataUrl };
         setShots(sessionKey, [...taken, shot]);
       }
       setFlash(true);
@@ -178,7 +232,7 @@ export function PhotoboothCapture({ frame, sessionKey, eyebrow, onDone, onBack }
 
       <div className="px-5">
         <div className="flex gap-1.5">
-          {frame.slots.map((s, i) => (
+          {shootSlots.map((s, i) => (
             <span
               key={s.id}
               className={cn(
@@ -198,6 +252,12 @@ export function PhotoboothCapture({ frame, sessionKey, eyebrow, onDone, onBack }
               <VideoOff className="mx-auto h-8 w-8 text-foreground/50" />
               <p className="mt-3 text-sm font-bold text-foreground">Kamera tidak tersedia</p>
               <p className="mt-1 text-xs font-medium text-foreground/60">{cameraError}</p>
+              <button
+                onClick={retryCamera}
+                className="tap-press mt-4 inline-flex items-center gap-1.5 rounded-full bg-gradient-primary px-4 py-2 text-xs font-extrabold text-primary-foreground"
+              >
+                <RefreshCw className="h-3.5 w-3.5" /> Coba Lagi
+              </button>
             </div>
           </div>
         ) : (
@@ -213,8 +273,25 @@ export function PhotoboothCapture({ frame, sessionKey, eyebrow, onDone, onBack }
           />
         )}
 
-        {/* camera HUD */}
-        <div className="absolute inset-4 rounded-2xl border-2 border-card/50" />
+        {/* Crop guide — everything dimmed outside is trimmed away once the shot lands in its
+            slot, so the customer can reframe (step back, turn the phone) before shooting. */}
+        {showCropGuide && (
+          <div className="pointer-events-none absolute inset-0">
+            <div
+              className="absolute inset-0 m-auto rounded-lg border-2 border-white/80"
+              style={{
+                aspectRatio: String(cropAspect),
+                maxWidth: "92%",
+                maxHeight: "92%",
+                boxShadow: "0 0 0 999px rgba(0,0,0,0.45)",
+              }}
+            />
+          </div>
+        )}
+
+        {/* camera HUD — the crop guide above already frames the shot once it's showing, so this
+            generic viewfinder border only appears when there's nothing else to frame it. */}
+        {!showCropGuide && <div className="absolute inset-4 rounded-2xl border-2 border-card/50" />}
         <div className="absolute top-4 left-4 flex items-center gap-1.5 rounded-full bg-background/40 px-2.5 py-1 text-[11px] font-extrabold text-foreground">
           <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-destructive" /> LIVE
         </div>
@@ -242,7 +319,7 @@ export function PhotoboothCapture({ frame, sessionKey, eyebrow, onDone, onBack }
 
       {/* Thumbnails */}
       <div className="mt-4 flex justify-center gap-2.5 overflow-x-auto px-5 pb-1">
-        {frame.slots.map((slot, i) => {
+        {shootSlots.map((slot, i) => {
           const shot = taken[i];
           return (
             <div key={slot.id} className="shrink-0">

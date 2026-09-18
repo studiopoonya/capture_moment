@@ -13,9 +13,6 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('/login', [AuthController::class, 'login']);
 
-Route::get('/frames', [FrameController::class, 'index']);
-Route::get('/filters', [FilterController::class, 'index']);
-Route::get('/stickers', [StickerController::class, 'index']);
 Route::get('/sessions/{slug}', [PhotoSessionController::class, 'show']);
 Route::get('/shared-sessions/{token}', [PhotoSessionController::class, 'showSharedGallery']);
 Route::post('/sessions/{session}/results', [PhotoSessionResultController::class, 'store']);

@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { FloatingSparkles } from "@/components/FloatingSparkles";
 import type { Frame } from "@/lib/api";
+import { buildSlotShotMap } from "@/lib/frame-slots";
 import type { Shot } from "@/lib/photobooth-store";
 
 type Props = {
@@ -22,6 +23,10 @@ const BASE_DELAY = 0.3;
  * Uses plain CSS @keyframes (see the note in WelcomeScreen.tsx) instead of framer-motion.
  */
 export function RevealAnimation({ frame, shots, filterCss, onComplete }: Props) {
+  // Slots sharing a shotGroup reuse one captured photo — resolve each slot's own shots-array
+  // index instead of assuming 1:1 position, otherwise slots beyond the actual shot count would
+  // never find their photo and stay blank through the reveal.
+  const slotShotMap = buildSlotShotMap(frame);
   const totalMs = (BASE_DELAY + frame.slots.length * STAGGER + ITEM_DURATION + 0.7) * 1000;
   const frameImageDelay = BASE_DELAY + frame.slots.length * STAGGER + 0.15;
   const captionDelay = BASE_DELAY + frame.slots.length * STAGGER + 0.5;
@@ -57,7 +62,7 @@ export function RevealAnimation({ frame, shots, filterCss, onComplete }: Props) 
 
         <div className="relative aspect-2/3 w-56 overflow-hidden rounded-2xl bg-white shadow-[0_20px_60px_rgba(0,0,0,0.55)]">
           {frame.slots.map((slot, i) => {
-            const shot = shots[i];
+            const shot = shots[slotShotMap[i]!];
             if (!shot) return null;
             return (
               <div

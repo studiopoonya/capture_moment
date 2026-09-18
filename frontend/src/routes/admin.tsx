@@ -32,6 +32,9 @@ import JSZip from "jszip";
 import { QRCodeCanvas } from "qrcode.react";
 import { toast } from "sonner";
 import { FrameComposite } from "@/components/FrameComposite";
+import { DEFAULT_WELCOME_MESSAGE } from "@/components/WelcomeScreen";
+import { captureSlots } from "@/lib/frame-slots";
+import type { Shot } from "@/lib/photobooth-store";
 import { toCanvasSafeUrl } from "@/lib/compose-result";
 import {
   createFilter,
@@ -72,6 +75,7 @@ import {
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
@@ -120,6 +124,11 @@ const EMPTY_FRAME: Frame = {
 function newSlotId(): string {
   return `s-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 }
+
+/** Generic person silhouette — lets an admin sanity-check slot cropping/positioning without
+ * needing a real capture. Never sent to the backend, purely a local preview aid. */
+const DUMMY_PHOTO_URL =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='600' viewBox='0 0 400 600'%3E%3Crect width='400' height='600' fill='%23dcd3c4'/%3E%3Ccircle cx='200' cy='190' r='85' fill='%23b89b74'/%3E%3Cpath d='M70 600 C70 410 125 330 200 330 C275 330 330 410 330 600 Z' fill='%23b89b74'/%3E%3C/svg%3E";
 
 function clamp(v: number, min: number, max: number): number {
   return Math.min(Math.max(v, min), Math.max(min, max));
@@ -714,12 +723,16 @@ function SessionsSection() {
 function WelcomeFieldsFieldset({
   welcomeTitle,
   setWelcomeTitle,
+  welcomeMessage,
+  setWelcomeMessage,
   welcomePhotoUrl,
   setWelcomePhotoUrl,
   customerName,
 }: {
   welcomeTitle: string;
   setWelcomeTitle: (v: string) => void;
+  welcomeMessage: string;
+  setWelcomeMessage: (v: string) => void;
   welcomePhotoUrl: string | null;
   setWelcomePhotoUrl: (v: string | null) => void;
   customerName: string;
@@ -784,6 +797,13 @@ function WelcomeFieldsFieldset({
         value={welcomeTitle}
         onChange={(e) => setWelcomeTitle(e.target.value)}
         placeholder={`Happy Wedding ${customerName || "..."}`}
+      />
+      <Textarea
+        value={welcomeMessage}
+        onChange={(e) => setWelcomeMessage(e.target.value)}
+        placeholder={DEFAULT_WELCOME_MESSAGE}
+        rows={3}
+        className="resize-none text-sm"
       />
     </div>
   );
@@ -871,6 +891,7 @@ function EditSessionDialog({
   const [filterIds, setFilterIds] = useState<number[]>([]);
   const [stickerIds, setStickerIds] = useState<number[]>([]);
   const [welcomeTitle, setWelcomeTitle] = useState("");
+  const [welcomeMessage, setWelcomeMessage] = useState("");
   const [welcomePhotoUrl, setWelcomePhotoUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -883,6 +904,7 @@ function EditSessionDialog({
     setFilterIds(session.filters.map((f) => f.id));
     setStickerIds(session.stickers.map((s) => s.id));
     setWelcomeTitle(session.welcome_title ?? "");
+    setWelcomeMessage(session.welcome_message ?? "");
     setWelcomePhotoUrl(session.welcome_photo ?? null);
   }, [session]);
 
@@ -896,6 +918,7 @@ function EditSessionDialog({
       sticker_ids: number[];
       welcome_photo: string | null;
       welcome_title: string | null;
+      welcome_message: string | null;
     }) => updateSession(session!.id, data),
     onSuccess: (updated) => {
       queryClient.setQueryData<PhotoSession[]>(["admin-sessions"], (old) =>
@@ -947,6 +970,7 @@ function EditSessionDialog({
                 sticker_ids: stickerIds,
                 welcome_photo: welcomePhotoUrl,
                 welcome_title: welcomeTitle.trim() || null,
+                welcome_message: welcomeMessage.trim() || null,
               });
             }}
             className="space-y-4"
@@ -976,6 +1000,8 @@ function EditSessionDialog({
             <WelcomeFieldsFieldset
               welcomeTitle={welcomeTitle}
               setWelcomeTitle={setWelcomeTitle}
+              welcomeMessage={welcomeMessage}
+              setWelcomeMessage={setWelcomeMessage}
               welcomePhotoUrl={welcomePhotoUrl}
               setWelcomePhotoUrl={setWelcomePhotoUrl}
               customerName={customerName}
@@ -2448,6 +2474,7 @@ function CreateSessionDialog({
   const [filterIds, setFilterIds] = useState<number[]>([]);
   const [stickerIds, setStickerIds] = useState<number[]>([]);
   const [welcomeTitle, setWelcomeTitle] = useState("");
+  const [welcomeMessage, setWelcomeMessage] = useState("");
   const [welcomePhotoUrl, setWelcomePhotoUrl] = useState<string | null>(null);
   const [result, setResult] = useState<{ slug: string; customer_name: string } | null>(null);
   const [copied, setCopied] = useState(false);
@@ -2474,6 +2501,7 @@ function CreateSessionDialog({
     setFilterIds([]);
     setStickerIds([]);
     setWelcomeTitle("");
+    setWelcomeMessage("");
     setWelcomePhotoUrl(null);
     setResult(null);
     setCopied(false);
@@ -2551,6 +2579,7 @@ function CreateSessionDialog({
                 sticker_ids: stickerIds,
                 welcome_photo: welcomePhotoUrl,
                 welcome_title: welcomeTitle.trim() || null,
+                welcome_message: welcomeMessage.trim() || null,
               });
             }}
             className="space-y-4"
@@ -2580,6 +2609,8 @@ function CreateSessionDialog({
             <WelcomeFieldsFieldset
               welcomeTitle={welcomeTitle}
               setWelcomeTitle={setWelcomeTitle}
+              welcomeMessage={welcomeMessage}
+              setWelcomeMessage={setWelcomeMessage}
               welcomePhotoUrl={welcomePhotoUrl}
               setWelcomePhotoUrl={setWelcomePhotoUrl}
               customerName={customerName}
@@ -2799,11 +2830,24 @@ function FrameForm({
   frames: Frame[];
   onSave: (f: Frame) => void;
 }) {
-  const [draft, setDraft] = useState<Frame>(initial);
+  // shotGroup is backfilled to an explicit number as soon as the form opens, instead of being
+  // left to fall back to array position at render time — otherwise adding/removing a slot later
+  // would shift everyone else's implicit position-based group and silently re-pair or un-pair
+  // slots the admin had already grouped.
+  const [draft, setDraft] = useState<Frame>(() => ({
+    ...initial,
+    slots: initial.slots.map((s, i) => ({ ...s, shotGroup: s.shotGroup ?? i + 1 })),
+  }));
   const [activeSlot, setActiveSlot] = useState(0);
   const [interacting, setInteracting] = useState(false);
+  const [showDummy, setShowDummy] = useState(false);
   const slot = draft.slots[activeSlot];
   const previewRef = useRef<HTMLDivElement>(null);
+  // One dummy photo per distinct capture point (not per slot) — duplicated slots correctly
+  // show the same placeholder, matching how a real capture would fill them.
+  const dummyShots: Shot[] = showDummy
+    ? captureSlots(draft).map((s) => ({ slotId: s.id, dataUrl: DUMMY_PHOTO_URL }))
+    : [];
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const uploadMutation = useMutation({
@@ -2902,9 +2946,19 @@ function FrameForm({
 
   const addSlot = () => {
     const last = draft.slots[draft.slots.length - 1];
+    // A fresh unique group number — every slot already carries an explicit shotGroup (backfilled
+    // on load), so this never collides with an existing pairing.
+    const nextGroup = Math.max(0, ...draft.slots.map((s) => s.shotGroup ?? 0)) + 1;
     const next: Slot = last
-      ? { id: newSlotId(), x: last.x, y: Math.min(94, last.y + last.h + 3), w: last.w, h: last.h }
-      : { id: newSlotId(), x: 10, y: 6, w: 80, h: 20 };
+      ? {
+          id: newSlotId(),
+          x: last.x,
+          y: Math.min(94, last.y + last.h + 3),
+          w: last.w,
+          h: last.h,
+          shotGroup: nextGroup,
+        }
+      : { id: newSlotId(), x: 10, y: 6, w: 80, h: 20, shotGroup: nextGroup };
     setDraft((d) => ({ ...d, slots: [...d.slots, next] }));
     setActiveSlot(draft.slots.length);
   };
@@ -2915,15 +2969,41 @@ function FrameForm({
     setActiveSlot((prev) => (index <= prev ? Math.max(0, prev - 1) : prev));
   };
 
+  /** Clones the active slot's position/size into a new slot that shares its shotGroup — the two
+   * render the same captured photo, so the customer only shoots once for both. Nudged slightly
+   * so the new slot is visible and grabbable right away instead of sitting exactly on top. */
+  const duplicateSlot = () => {
+    const source = draft.slots[activeSlot];
+    if (!source) return;
+    const next: Slot = {
+      ...source,
+      id: newSlotId(),
+      x: clamp(source.x + 4, 0, 100 - source.w),
+      y: clamp(source.y + 4, 0, 100 - source.h),
+    };
+    setDraft((d) => ({ ...d, slots: [...d.slots, next] }));
+    setActiveSlot(draft.slots.length);
+  };
+
   return (
     <div className="grid gap-8 md:grid-cols-[340px_minmax(0,1fr)]">
       <div>
-        <p className="mb-2 text-xs font-bold text-muted-foreground">
-          Preview slot <span className="font-semibold text-muted-foreground/70">— geser & tarik titik di sudut/sisi buat atur ukuran</span>
-        </p>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <p className="text-xs font-bold text-muted-foreground">
+            Preview slot{" "}
+            <span className="font-semibold text-muted-foreground/70">
+              — geser & tarik titik di sudut/sisi buat atur ukuran
+            </span>
+          </p>
+          <label className="flex shrink-0 items-center gap-1.5 text-[11px] font-bold text-muted-foreground">
+            Foto dummy
+            <Switch checked={showDummy} onCheckedChange={setShowDummy} />
+          </label>
+        </div>
         <div ref={previewRef} className="relative touch-none select-none">
           <FrameComposite
             frame={draft}
+            shots={dummyShots}
             showSlotLabels
             activeSlotIndex={activeSlot}
             instant={interacting}
@@ -3077,6 +3157,19 @@ function FrameForm({
                 </span>
               </div>
             ))}
+
+            <button
+              type="button"
+              onClick={duplicateSlot}
+              className="tap-press flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-border py-2.5 text-xs font-extrabold text-muted-foreground hover:border-primary hover:text-primary"
+            >
+              <Copy className="h-3.5 w-3.5" /> Duplikat Slot Terpilih
+            </button>
+            <p className="text-[11px] font-medium text-muted-foreground/70">
+              Bikin slot baru yang nampilin foto yang sama kayak Slot {activeSlot + 1} — dipakai
+              buat efek foto dobel (misal 6 kotak tapi cukup 3x jepret), lalu geser/resize slot
+              barunya ke posisi yang pas.
+            </p>
           </div>
         )}
 
